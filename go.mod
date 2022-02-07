@@ -9,4 +9,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.17.1 // indirect
 	github.com/aws/smithy-go v1.10.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/mattn/go-sqlite3 v1.14.11 // indirect
 )

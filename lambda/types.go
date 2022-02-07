@@ -18,3 +18,10 @@ type PublishLayerVersionBody struct {
 	Description             *string
 	LicenseInfo             *string
 }
+
+type LambdaLayer struct {
+	ID          int
+	Name        string
+	Version     int
+	Description string
+}

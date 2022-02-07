@@ -60,6 +60,10 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 		return fmt.Errorf("error when saving layer %s: %v", *layerName, err)
 	}
 
+	ctx := request.Context()
+	db := createConnection(ctx)
+	defer db.Close()
+
 	return nil
 }
 

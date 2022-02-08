@@ -24,4 +24,5 @@ type LambdaLayer struct {
 	Name        string
 	Version     int
 	Description string
+	CreatedOn   int
 }

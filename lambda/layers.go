@@ -60,11 +60,16 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 		return fmt.Errorf("error when saving layer %s: %v", *layerName, err)
 	}
 
+	layer := LambdaLayer{Name: *layerName,
+		Version:     len(versions),
+		Description: *body.Description,
+	}
+
 	ctx := request.Context()
 	db := createConnection(ctx)
 	defer db.Close()
 
-	return nil
+	return addLayer(ctx, db, layer, body.CompatibleRuntimes)
 }
 
 func listLayerVersions(layerName *string) ([]int, error) {

@@ -1,17 +1,12 @@
 package lambda
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"myaws/config"
 	"myaws/utils"
 	"net/http"
-	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -44,64 +39,34 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 	log.Printf("Layer description: %s", *body.Description)
 	log.Printf("Layer runtimes: %v", body.CompatibleRuntimes)
 
-	versions, err := listLayerVersions(layerName)
-	if err != nil {
+	ctx := request.Context()
+	db := createConnection(ctx)
+	defer db.Close()
+
+	version, err := getLatestLayerVersion(ctx, db, *layerName)
+	switch {
+	case err == sql.ErrNoRows:
+		version = -1
+	case err != nil:
 		return fmt.Errorf("error when listing versions for %s: %v", *layerName, err)
 	}
 
-	log.Printf("Found following verions for layer %s: %v", *layerName, versions)
+	log.Printf("Found latest verion for layer %s: %v", *layerName, version)
 	log.Printf("Decompressing %d bytes from zipfile", len(body.Content.ZipFile))
 
-	destPath := filepath.Join(config.GetSettings().GetDataPath(), "lambda", "layers", *layerName,
-		strconv.Itoa(len(versions)), "content")
+	layer := LambdaLayer{Name: *layerName,
+		Version:            version + 1,
+		Description:        *body.Description,
+		CompatibleRuntimes: body.CompatibleRuntimes,
+	}
+
+	destPath := layer.getDestPath()
+	log.Printf("Saving layer %s to %s...", *layerName, destPath)
 
 	err = utils.DecompressZipFile(body.Content.ZipFile, destPath)
 	if err != nil {
 		return fmt.Errorf("error when saving layer %s: %v", *layerName, err)
 	}
 
-	layer := LambdaLayer{Name: *layerName,
-		Version:     len(versions),
-		Description: *body.Description,
-	}
-
-	ctx := request.Context()
-	db := createConnection(ctx)
-	defer db.Close()
-
-	return addLayer(ctx, db, layer, body.CompatibleRuntimes)
-}
-
-func listLayerVersions(layerName *string) ([]int, error) {
-	settings := config.GetSettings()
-	layerPath := filepath.Join(settings.GetDataPath(), "lambda", "layers", *layerName)
-	log.Printf("Making directory %s if it does not exist", layerPath)
-
-	err := os.MkdirAll(layerPath, 0700)
-	if err != nil {
-		log.Printf("Unable to make directory %s", layerPath)
-		return nil, err
-	}
-
-	log.Printf("Listing layer versions in %s", layerPath)
-	contents, err := ioutil.ReadDir(layerPath)
-	if err != nil {
-		log.Printf("Unable to list contents of directory %s", layerPath)
-		return nil, err
-	}
-
-	versions := make([]int, len(contents))
-	for i, value := range contents {
-		name := value.Name()
-		intValue, err := strconv.Atoi(name)
-		if err != nil {
-			log.Printf("Error when converting %s to number in %s", name, layerPath)
-			return nil, err
-		}
-
-		versions[i] = intValue
-	}
-
-	sort.Ints(versions)
-	return versions, nil
+	return addLayer(ctx, db, layer)
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"myaws/utils"
+	"time"
 )
 
 const createLayerTable = `
@@ -21,6 +22,10 @@ CREATE TABLE IF NOT EXISTS lambda_layer (
 const insertLayer = `
 INSERT INTO lambda_layer (name, description, version, created_on)
 VALUES (?, ?, ?, ?)
+`
+
+const queryLatestVersionByLayerName = `
+SELECT name, max(version) from lambda_layer where name = ?
 `
 
 const createRuntimeTable = `
@@ -76,8 +81,8 @@ func createConnection(ctx context.Context) *sql.DB {
 
 var txWriteOptions = sql.TxOptions{Isolation: sql.LevelDefault, ReadOnly: false}
 
-func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer, runtimes []Runtime) error {
-	dbRuntimes, err := getLayerRuntimes(ctx, db, runtimes)
+func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) error {
+	dbRuntimes, err := getLayerRuntimes(ctx, db, layer.CompatibleRuntimes)
 	switch {
 	case err == sql.ErrNoRows:
 		return fmt.Errorf("unable to find all expected runtimes: %v", err)
@@ -91,8 +96,8 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer, runtimes []Run
 	}
 
 	log.Printf("Inserting lambda layer %+v", layer)
-
-	insert, err := tx.ExecContext(ctx, insertLayer, layer.Name, layer.Description, layer.Version, 100)
+	
+	insert, err := tx.ExecContext(ctx, insertLayer, layer.Name, layer.Description, layer.Version, time.Now().UnixMilli())
 	if err != nil {
 		return fmt.Errorf("unable to insert lambda layer %s: %v", layer.Name, err)
 	}
@@ -155,4 +160,19 @@ func getLayerRuntimes(ctx context.Context, db *sql.DB, runtimes []Runtime) (map[
 	}
 
 	return results, resultError
+}
+
+func getLatestLayerVersion(ctx context.Context, db *sql.DB, name string) (int, error) {
+	var dbName sql.NullString
+	var dbVersion sql.NullInt32
+	err := db.QueryRowContext(ctx, queryLatestVersionByLayerName, name).Scan(&dbName, &dbVersion)
+	if err != nil {
+		return -1, err
+	}
+
+	if dbName.Valid && dbVersion.Valid {
+		return int(dbVersion.Int32), nil
+	}
+
+	return -1, sql.ErrNoRows
 }

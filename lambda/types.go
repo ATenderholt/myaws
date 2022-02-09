@@ -1,5 +1,11 @@
 package lambda
 
+import (
+	"myaws/config"
+	"path/filepath"
+	"strconv"
+)
+
 type LayerVersionContentInput struct {
 	S3Bucket        *string
 	S3Key           *string
@@ -20,9 +26,15 @@ type PublishLayerVersionBody struct {
 }
 
 type LambdaLayer struct {
-	ID          int
-	Name        string
-	Version     int
-	Description string
-	CreatedOn   int
+	ID                 int
+	Name               string
+	Version            int
+	Description        string
+	CreatedOn          int64
+	CompatibleRuntimes []Runtime
+}
+
+func (layer LambdaLayer) getDestPath() string {
+	return filepath.Join(config.GetSettings().GetDataPath(), "lambda", "layers", layer.Name,
+		strconv.Itoa(layer.Version), "content")
 }

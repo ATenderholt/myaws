@@ -96,27 +96,10 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) error {
 	}
 
 	log.Printf("Inserting lambda layer %+v", layer)
-	
-	insert, err := tx.ExecContext(ctx, insertLayer, layer.Name, layer.Description, layer.Version, time.Now().UnixMilli())
-	if err != nil {
-		return fmt.Errorf("unable to insert lambda layer %s: %v", layer.Name, err)
-	}
 
-	count, err := insert.RowsAffected()
+	layerId, err := utils.InsertOne(tx, ctx, insertLayer, layer.Name, layer.Description, layer.Version, time.Now().UnixMilli())
 	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("unexpected error when inserting lambda layer %s: %v", layer.Name, err)
-	}
-
-	if count != 1 {
-		tx.Rollback()
-		return fmt.Errorf("expected only 1 insert for lambda layer %s but got %d", layer.Name, count)
-	}
-
-	layerId, err := insert.LastInsertId()
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("unexpected error when inserting lambda layer %s: %v", layer.Name, err)
+		return fmt.Errorf("unable to insert layer %s: %v", layer.Name, err)
 	}
 
 	stmt, err := tx.PrepareContext(ctx, insertLayerRuntime)

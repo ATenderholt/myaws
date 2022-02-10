@@ -26,11 +26,11 @@ type PublishLayerVersionBody struct {
 }
 
 type LambdaLayer struct {
-	ID                 int
+	ID                 int64
 	Name               string
 	Version            int
 	Description        string
-	CreatedOn          int64
+	CreatedOn          string
 	CompatibleRuntimes []Runtime
 }
 

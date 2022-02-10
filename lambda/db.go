@@ -81,31 +81,32 @@ func createConnection(ctx context.Context) *sql.DB {
 
 var txWriteOptions = sql.TxOptions{Isolation: sql.LevelDefault, ReadOnly: false}
 
-func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) error {
+func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer, error) {
 	dbRuntimes, err := getLayerRuntimes(ctx, db, layer.CompatibleRuntimes)
 	switch {
 	case err == sql.ErrNoRows:
-		return fmt.Errorf("unable to find all expected runtimes: %v", err)
+		return nil, fmt.Errorf("unable to find all expected runtimes: %v", err)
 	case err != nil:
-		return fmt.Errorf("error when adding runtime: %v", err)
+		return nil, fmt.Errorf("error when adding runtime: %v", err)
 	}
 
 	tx, err := db.BeginTx(ctx, &txWriteOptions)
 	if err != nil {
-		return fmt.Errorf("unable to create transaction to add lambda layer %v: %v", layer, err)
+		return nil, fmt.Errorf("unable to create transaction to add lambda layer %v: %v", layer, err)
 	}
 
 	log.Printf("Inserting lambda layer %+v", layer)
 
-	layerId, err := utils.InsertOne(tx, ctx, insertLayer, layer.Name, layer.Description, layer.Version, time.Now().UnixMilli())
+	createdOn := time.Now()
+	layerId, err := utils.InsertOne(tx, ctx, insertLayer, layer.Name, layer.Description, layer.Version, createdOn.UnixMilli())
 	if err != nil {
-		return fmt.Errorf("unable to insert layer %s: %v", layer.Name, err)
+		return nil, fmt.Errorf("unable to insert layer %s: %v", layer.Name, err)
 	}
 
 	stmt, err := tx.PrepareContext(ctx, insertLayerRuntime)
 	if err != nil {
 		tx.Rollback()
-		return fmt.Errorf("unable to prepare statement for inserting layer runtimes for %s: %v", layer.Name,
+		return nil, fmt.Errorf("unable to prepare statement for inserting layer runtimes for %s: %v", layer.Name,
 			err)
 	}
 
@@ -114,12 +115,25 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) error {
 		_, err := stmt.ExecContext(ctx, layerId, runtimeId)
 		if err != nil {
 			tx.Rollback()
-			return fmt.Errorf("unable to insert runtime %s for layer %s: %v", runtimeName, layer.Name, err)
+			return nil, fmt.Errorf("unable to insert runtime %s for layer %s: %v", runtimeName, layer.Name, err)
 		}
 	}
 
-	tx.Commit()
-	return nil
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("unable to commit layer %s: %v", layer.Name, err)
+	}
+
+	result := LambdaLayer{
+		ID:                 layerId,
+		Name:               layer.Name,
+		Version:            layer.Version,
+		Description:        layer.Description,
+		CreatedOn:          createdOn.Format("2006-01-02T15:04:05.999-0700"),
+		CompatibleRuntimes: layer.CompatibleRuntimes,
+	}
+
+	return &result, nil
 }
 
 func getLayerRuntimes(ctx context.Context, db *sql.DB, runtimes []Runtime) (map[Runtime]int, error) {

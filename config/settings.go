@@ -6,7 +6,9 @@ import (
 )
 
 type Settings struct {
-	dataPath string
+	accountNumber string
+	dataPath      string
+	region        string
 }
 
 var once sync.Once
@@ -17,6 +19,9 @@ func GetSettings() *Settings {
 		instance = Settings{}
 		flag.StringVar(&instance.dataPath, "data-path", "data", "Path to data directory")
 		flag.Parse()
+
+		instance.accountNumber = "000000000000"
+		instance.region = "us-west-2"
 	})
 
 	return &instance
@@ -24,4 +29,8 @@ func GetSettings() *Settings {
 
 func (settings *Settings) GetDataPath() string {
 	return settings.dataPath
+}
+
+func (settings *Settings) GetArnFragment() string {
+	return settings.accountNumber + ":" + settings.region
 }

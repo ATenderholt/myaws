@@ -1,12 +1,17 @@
 package lambda
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"log"
+	"myaws/config"
 	"myaws/utils"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -68,5 +73,37 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 		return fmt.Errorf("error when saving layer %s: %v", *layerName, err)
 	}
 
-	return addLayer(ctx, db, layer)
+	savedLayer, err := addLayer(ctx, db, layer)
+	if err != nil {
+		return err
+	}
+
+	rawHash := sha256.Sum256(body.Content.ZipFile)
+	hash := fmt.Sprintf("%x", rawHash)
+	content := types.LayerVersionContentOutput{
+		CodeSha256: &hash,
+		CodeSize:   int64(len(body.Content.ZipFile)),
+	}
+
+	arn := "arn:aws:lambda:" + config.GetSettings().GetArnFragment() + ":layer:" + *layerName
+	versionArn := arn + ":" + strconv.Itoa(savedLayer.Version)
+
+	result := lambda.PublishLayerVersionOutput{
+		CompatibleArchitectures: nil,
+		CompatibleRuntimes:      nil,
+		Content:                 &content,
+		CreatedDate:             &savedLayer.CreatedOn,
+		Description:             &savedLayer.Description,
+		LayerArn:                &arn,
+		LayerVersionArn:         &versionArn,
+		LicenseInfo:             nil,
+		Version:                 int64(savedLayer.Version),
+	}
+
+	err = json.NewEncoder(*response).Encode(result)
+	if err != nil {
+		return fmt.Errorf("unable to return mashalled response for %+v: %v", result, err)
+	}
+
+	return nil
 }

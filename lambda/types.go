@@ -1,29 +1,11 @@
 package lambda
 
 import (
+	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"myaws/config"
 	"path/filepath"
 	"strconv"
 )
-
-type LayerVersionContentInput struct {
-	S3Bucket        *string
-	S3Key           *string
-	S3ObjectVersion *string
-	ZipFile         []byte
-}
-
-type Architecture string
-type Runtime string
-
-type PublishLayerVersionBody struct {
-	Content                 LayerVersionContentInput
-	LayerName               *string
-	CompatibleArchitectures []Architecture
-	CompatibleRuntimes      []Runtime
-	Description             *string
-	LicenseInfo             *string
-}
 
 type LambdaLayer struct {
 	ID                 int64
@@ -31,7 +13,7 @@ type LambdaLayer struct {
 	Version            int
 	Description        string
 	CreatedOn          string
-	CompatibleRuntimes []Runtime
+	CompatibleRuntimes []types.Runtime
 }
 
 func (layer LambdaLayer) getDestPath() string {

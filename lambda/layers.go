@@ -34,7 +34,7 @@ func LayerHandler(response http.ResponseWriter, request *http.Request) {
 func handleLayerPost(layerName *string, response *http.ResponseWriter, request *http.Request) error {
 	dec := json.NewDecoder(request.Body)
 
-	var body PublishLayerVersionBody
+	var body lambda.PublishLayerVersionInput
 	err := dec.Decode(&body)
 
 	if err != nil {
@@ -59,7 +59,8 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 	log.Printf("Found latest verion for layer %s: %v", *layerName, version)
 	log.Printf("Decompressing %d bytes from zipfile", len(body.Content.ZipFile))
 
-	layer := LambdaLayer{Name: *layerName,
+	layer := LambdaLayer{
+		Name:               *layerName,
 		Version:            version + 1,
 		Description:        *body.Description,
 		CompatibleRuntimes: body.CompatibleRuntimes,
@@ -90,7 +91,7 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 
 	result := lambda.PublishLayerVersionOutput{
 		CompatibleArchitectures: nil,
-		CompatibleRuntimes:      nil,
+		CompatibleRuntimes:      savedLayer.CompatibleRuntimes,
 		Content:                 &content,
 		CreatedDate:             &savedLayer.CreatedOn,
 		Description:             &savedLayer.Description,

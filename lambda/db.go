@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"log"
 	"myaws/utils"
 	"time"
@@ -136,8 +137,8 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer,
 	return &result, nil
 }
 
-func getLayerRuntimes(ctx context.Context, db *sql.DB, runtimes []Runtime) (map[Runtime]int, error) {
-	results := make(map[Runtime]int, len(runtimes))
+func getLayerRuntimes(ctx context.Context, db *sql.DB, runtimes []types.Runtime) (map[types.Runtime]int, error) {
+	results := make(map[types.Runtime]int, len(runtimes))
 	var resultError error = nil
 	for _, runtime := range runtimes {
 		var id int

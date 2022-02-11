@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"log"
 	"myaws/utils"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,15 @@ VALUES (?, ?, ?, ?)
 
 const queryLatestVersionByLayerName = `
 SELECT name, max(version) from lambda_layer where name = ?
+`
+
+const queryAllVersionsByLayerName = `
+SELECT ll.id, ll.name, ll.description, ll.version, ll.created_on, GROUP_CONCAT(r.name) AS runtimes
+FROM lambda_runtime AS r
+INNER JOIN lambda_layer_runtime llr ON r.id = llr.lambda_runtime_id
+INNER JOIN lambda_layer ll ON llr.lambda_layer_id = ll.id
+WHERE ll.name = ?
+GROUP BY llr.lambda_layer_id;
 `
 
 const createRuntimeTable = `
@@ -158,6 +168,47 @@ func getLayerRuntimes(ctx context.Context, db *sql.DB, runtimes []types.Runtime)
 	}
 
 	return results, resultError
+}
+
+func getAllLayerVersions(ctx context.Context, db *sql.DB, name string) ([]LambdaLayer, error) {
+	var results []LambdaLayer
+	rows, err := db.QueryContext(ctx, queryAllVersionsByLayerName, name)
+	switch {
+	case err == sql.ErrNoRows:
+		return results, nil
+	case err != nil:
+		return nil, fmt.Errorf("problem querying for all versions for layer %s: %v", name, err)
+	}
+
+	for rows.Next() {
+		var result LambdaLayer
+		var createdOn int64
+		var runtimes string
+		err := rows.Scan(&result.ID, &result.Name, &result.Description, &result.Version, &createdOn, &runtimes)
+
+		if err != nil {
+			return results, fmt.Errorf("problem parsing results when querying all versions for layer %s: %v", name, err)
+		}
+
+		result.CreatedOn = time.UnixMilli(createdOn).Format("2006-01-02T15:04:05.999-0700")
+		result.CompatibleRuntimes = stringToRuntimes(runtimes)
+
+		log.Printf("got row when querying lambda layer %s: %+v", name, result)
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+func stringToRuntimes(runtime string) []types.Runtime {
+	log.Printf("converting %s to list of runtimes", runtime)
+	split := strings.Split(runtime, ",")
+	runtimes := make([]types.Runtime, len(split))
+	for i, value := range split {
+		runtimes[i] = types.Runtime(value)
+	}
+
+	return runtimes
 }
 
 func getLatestLayerVersion(ctx context.Context, db *sql.DB, name string) (int, error) {

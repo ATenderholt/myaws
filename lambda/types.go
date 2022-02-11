@@ -2,7 +2,6 @@ package lambda
 
 import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"myaws/config"
 	"path/filepath"
 	"strconv"
 )
@@ -17,6 +16,17 @@ type LambdaLayer struct {
 }
 
 func (layer LambdaLayer) getDestPath() string {
-	return filepath.Join(config.GetSettings().GetDataPath(), "lambda", "layers", layer.Name,
+	return filepath.Join(settings.GetDataPath(), "lambda", "layers", layer.Name,
 		strconv.Itoa(layer.Version), "content")
+}
+
+func (layer LambdaLayer) getArn() *string {
+	result := "arn:aws:lambda" + settings.GetArnFragment() + ":layer:" + layer.Name
+	return &result
+}
+
+func (layer LambdaLayer) getVersionArn() *string {
+	arn := layer.getArn()
+	result := *arn + ":" + strconv.Itoa(layer.Version)
+	return &result
 }

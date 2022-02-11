@@ -8,10 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"log"
-	"myaws/config"
 	"myaws/utils"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -22,13 +20,62 @@ func LayerHandler(response http.ResponseWriter, request *http.Request) {
 	layerName := parts[3]
 
 	log.Printf("Processing for Lambda layer name '%s'", layerName)
-	if request.Method == "POST" {
-		err := handleLayerPost(&layerName, &response, request)
-		if err != nil {
-			http.Error(response, err.Error(), http.StatusInternalServerError)
-		}
+	var err error
+	switch request.Method {
+	case "GET":
+		err = handleLayerGet(&layerName, &response, request)
+	case "POST":
+		err = handleLayerPost(&layerName, &response, request)
 	}
 
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusInternalServerError)
+	}
+
+}
+
+func handleLayerGet(layerName *string, response *http.ResponseWriter, request *http.Request) error {
+	log.Printf("Querying for versions of layer %s", *layerName)
+
+	ctx := request.Context()
+	db := createConnection(ctx)
+	defer db.Close()
+
+	layers, err := getAllLayerVersions(ctx, db, *layerName)
+	if err != nil {
+		return err
+	}
+
+	result := lambda.ListLayerVersionsOutput{
+		LayerVersions: layersToAwsLayers(layers),
+		NextMarker:    nil,
+	}
+
+	err = json.NewEncoder(*response).Encode(result)
+	if err != nil {
+		return fmt.Errorf("unable to return mashalled response for %+v: %v", result, err)
+	}
+
+	return nil
+}
+
+func layersToAwsLayers(layers []LambdaLayer) []types.LayerVersionsListItem {
+	results := make([]types.LayerVersionsListItem, len(layers))
+	for i, layer := range layers {
+		result := types.LayerVersionsListItem{
+			CompatibleArchitectures: nil,
+			CompatibleRuntimes:      layer.CompatibleRuntimes,
+			CreatedDate:             &layer.CreatedOn,
+			Description:             &layer.Description,
+			LayerVersionArn:         layer.getVersionArn(),
+			LicenseInfo:             nil,
+			Version:                 int64(layer.Version),
+		}
+
+		results[i] = result
+	}
+
+	return results
 }
 
 func handleLayerPost(layerName *string, response *http.ResponseWriter, request *http.Request) error {
@@ -86,17 +133,14 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 		CodeSize:   int64(len(body.Content.ZipFile)),
 	}
 
-	arn := "arn:aws:lambda:" + config.GetSettings().GetArnFragment() + ":layer:" + *layerName
-	versionArn := arn + ":" + strconv.Itoa(savedLayer.Version)
-
 	result := lambda.PublishLayerVersionOutput{
 		CompatibleArchitectures: nil,
 		CompatibleRuntimes:      savedLayer.CompatibleRuntimes,
 		Content:                 &content,
 		CreatedDate:             &savedLayer.CreatedOn,
 		Description:             &savedLayer.Description,
-		LayerArn:                &arn,
-		LayerVersionArn:         &versionArn,
+		LayerArn:                savedLayer.getArn(),
+		LayerVersionArn:         savedLayer.getVersionArn(),
 		LicenseInfo:             nil,
 		Version:                 int64(savedLayer.Version),
 	}

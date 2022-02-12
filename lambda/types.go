@@ -13,6 +13,8 @@ type LambdaLayer struct {
 	Description        string
 	CreatedOn          string
 	CompatibleRuntimes []types.Runtime
+	CodeSize           int64
+	CodeSha256         string
 }
 
 func (layer LambdaLayer) getDestPath() string {

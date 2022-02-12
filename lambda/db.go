@@ -17,13 +17,15 @@ CREATE TABLE IF NOT EXISTS lambda_layer (
     name         text not null,
     description  text not null,
 	version      integer not null,
-	created_on   integer not null
+	created_on   integer not null,
+	code_size	 integer not null,
+	code_sha256  text not null
 );
 `
 
 const insertLayer = `
-INSERT INTO lambda_layer (name, description, version, created_on)
-VALUES (?, ?, ?, ?)
+INSERT INTO lambda_layer (name, description, version, created_on, code_size, code_sha256)
+VALUES (?, ?, ?, ?, ?, ?)
 `
 
 const queryLatestVersionByLayerName = `
@@ -31,7 +33,8 @@ SELECT name, max(version) from lambda_layer where name = ?
 `
 
 const queryAllVersionsByLayerName = `
-SELECT ll.id, ll.name, ll.description, ll.version, ll.created_on, GROUP_CONCAT(r.name) AS runtimes
+SELECT ll.id, ll.name, ll.description, ll.version, ll.created_on, GROUP_CONCAT(r.name) AS runtimes,
+    ll.code_size, ll.code_sha256
 FROM lambda_runtime AS r
 INNER JOIN lambda_layer_runtime llr ON r.id = llr.lambda_runtime_id
 INNER JOIN lambda_layer ll ON llr.lambda_layer_id = ll.id
@@ -109,7 +112,15 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer,
 	log.Printf("Inserting lambda layer %+v", layer)
 
 	createdOn := time.Now()
-	layerId, err := utils.InsertOne(tx, ctx, insertLayer, layer.Name, layer.Description, layer.Version, createdOn.UnixMilli())
+	layerId, err := utils.InsertOne(tx, ctx, insertLayer,
+		layer.Name,
+		layer.Description,
+		layer.Version,
+		createdOn.UnixMilli(),
+		layer.CodeSize,
+		layer.CodeSha256,
+	)
+
 	if err != nil {
 		return nil, fmt.Errorf("unable to insert layer %s: %v", layer.Name, err)
 	}
@@ -142,6 +153,8 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer,
 		Description:        layer.Description,
 		CreatedOn:          createdOn.Format("2006-01-02T15:04:05.999-0700"),
 		CompatibleRuntimes: layer.CompatibleRuntimes,
+		CodeSize:           layer.CodeSize,
+		CodeSha256:         layer.CodeSha256,
 	}
 
 	return &result, nil
@@ -184,7 +197,8 @@ func getAllLayerVersions(ctx context.Context, db *sql.DB, name string) ([]Lambda
 		var result LambdaLayer
 		var createdOn int64
 		var runtimes string
-		err := rows.Scan(&result.ID, &result.Name, &result.Description, &result.Version, &createdOn, &runtimes)
+		err := rows.Scan(&result.ID, &result.Name, &result.Description, &result.Version, &createdOn, &runtimes,
+			&result.CodeSize, &result.CodeSha256)
 
 		if err != nil {
 			return results, fmt.Errorf("problem parsing results when querying all versions for layer %s: %v", name, err)
@@ -207,7 +221,8 @@ func getLayerVersion(ctx context.Context, db *sql.DB, name string, version int) 
 	var runtimes string
 
 	query := `
-SELECT ll.id, ll.name, ll.description, ll.version, ll.created_on, GROUP_CONCAT(r.name) AS runtimes
+SELECT ll.id, ll.name, ll.description, ll.version, ll.created_on, GROUP_CONCAT(r.name) AS runtimes,
+       ll.code_size, ll.code_sha256
 FROM lambda_runtime AS r
 INNER JOIN lambda_layer_runtime llr ON r.id = llr.lambda_runtime_id
 INNER JOIN lambda_layer ll ON llr.lambda_layer_id = ll.id
@@ -221,6 +236,8 @@ GROUP BY llr.lambda_layer_id;
 		&result.Version,
 		&createdOn,
 		&runtimes,
+		&result.CodeSize,
+		&result.CodeSha256,
 	)
 
 	if err != nil {

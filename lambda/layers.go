@@ -3,6 +3,7 @@ package lambda
 import (
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -66,15 +67,18 @@ func GetLayerVersion(response http.ResponseWriter, request *http.Request) {
 	}
 
 	result := lambda.GetLayerVersionOutput{
-		CompatibleArchitectures: nil,
+		CompatibleArchitectures: []types.Architecture{},
 		CompatibleRuntimes:      layer.CompatibleRuntimes,
-		Content:                 &types.LayerVersionContentOutput{},
-		CreatedDate:             &layer.CreatedOn,
-		Description:             &layer.Description,
-		LayerArn:                layer.getArn(),
-		LayerVersionArn:         layer.getVersionArn(),
-		LicenseInfo:             nil,
-		Version:                 int64(layer.Version),
+		Content: &types.LayerVersionContentOutput{
+			CodeSize:   layer.CodeSize,
+			CodeSha256: &layer.CodeSha256,
+		},
+		CreatedDate:     &layer.CreatedOn,
+		Description:     &layer.Description,
+		LayerArn:        layer.getArn(),
+		LayerVersionArn: layer.getVersionArn(),
+		LicenseInfo:     nil,
+		Version:         int64(layer.Version),
 	}
 
 	err = json.NewEncoder(response).Encode(result)
@@ -88,7 +92,7 @@ func layersToAwsLayers(layers []LambdaLayer) []types.LayerVersionsListItem {
 	results := make([]types.LayerVersionsListItem, len(layers))
 	for i, layer := range layers {
 		result := types.LayerVersionsListItem{
-			CompatibleArchitectures: nil,
+			CompatibleArchitectures: []types.Architecture{},
 			CompatibleRuntimes:      layer.CompatibleRuntimes,
 			CreatedDate:             &layer.CreatedOn,
 			Description:             &layer.Description,
@@ -137,11 +141,16 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 	log.Printf("Found latest verion for layer %s: %v", layerName, version)
 	log.Printf("Decompressing %d bytes from zipfile", len(body.Content.ZipFile))
 
+	rawHash := sha256.Sum256(body.Content.ZipFile)
+	hash := base64.StdEncoding.EncodeToString(rawHash[:])
+
 	layer := LambdaLayer{
 		Name:               layerName,
 		Version:            version + 1,
 		Description:        *body.Description,
 		CompatibleRuntimes: body.CompatibleRuntimes,
+		CodeSize:           int64(len(body.Content.ZipFile)),
+		CodeSha256:         hash,
 	}
 
 	destPath := layer.getDestPath()
@@ -158,23 +167,19 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 		http.Error(response, err.Error(), http.StatusInternalServerError)
 	}
 
-	rawHash := sha256.Sum256(body.Content.ZipFile)
-	hash := fmt.Sprintf("%x", rawHash)
-	content := types.LayerVersionContentOutput{
-		CodeSha256: &hash,
-		CodeSize:   int64(len(body.Content.ZipFile)),
-	}
-
 	result := lambda.PublishLayerVersionOutput{
-		CompatibleArchitectures: nil,
+		CompatibleArchitectures: []types.Architecture{},
 		CompatibleRuntimes:      savedLayer.CompatibleRuntimes,
-		Content:                 &content,
-		CreatedDate:             &savedLayer.CreatedOn,
-		Description:             &savedLayer.Description,
-		LayerArn:                savedLayer.getArn(),
-		LayerVersionArn:         savedLayer.getVersionArn(),
-		LicenseInfo:             nil,
-		Version:                 int64(savedLayer.Version),
+		Content: &types.LayerVersionContentOutput{
+			CodeSize:   savedLayer.CodeSize,
+			CodeSha256: &savedLayer.CodeSha256,
+		},
+		CreatedDate:     &savedLayer.CreatedOn,
+		Description:     &savedLayer.Description,
+		LayerArn:        savedLayer.getArn(),
+		LayerVersionArn: savedLayer.getVersionArn(),
+		LicenseInfo:     nil,
+		Version:         int64(savedLayer.Version),
 	}
 
 	err = json.NewEncoder(response).Encode(result)

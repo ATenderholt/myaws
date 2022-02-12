@@ -32,5 +32,5 @@ func (settings *Settings) GetDataPath() string {
 }
 
 func (settings *Settings) GetArnFragment() string {
-	return settings.accountNumber + ":" + settings.region
+	return settings.region + ":" + settings.accountNumber
 }

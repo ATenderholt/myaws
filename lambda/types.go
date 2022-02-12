@@ -21,7 +21,7 @@ func (layer LambdaLayer) getDestPath() string {
 }
 
 func (layer LambdaLayer) getArn() *string {
-	result := "arn:aws:lambda" + settings.GetArnFragment() + ":layer:" + layer.Name
+	result := "arn:aws:lambda:" + settings.GetArnFragment() + ":layer:" + layer.Name
 	return &result
 }
 

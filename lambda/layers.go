@@ -13,6 +13,11 @@ import (
 	"strings"
 )
 
+func getLayerName(path string) string {
+	parts := strings.Split(path, "/")
+	return parts[3]
+}
+
 func LayerHandler(response http.ResponseWriter, request *http.Request) {
 	log.Printf("--- Request %s %q ---", request.Method, request.URL.Path)
 
@@ -22,10 +27,10 @@ func LayerHandler(response http.ResponseWriter, request *http.Request) {
 	log.Printf("Processing for Lambda layer name '%s'", layerName)
 	var err error
 	switch request.Method {
-	case "GET":
-		err = handleLayerGet(&layerName, &response, request)
-	case "POST":
-		err = handleLayerPost(&layerName, &response, request)
+	//case "GET":
+	//	err = getLayerVersions(response, request)
+	//case "POST":
+	//	err = handleLayerPost(&layerName, &response, request)
 	}
 
 	if err != nil {
@@ -34,16 +39,18 @@ func LayerHandler(response http.ResponseWriter, request *http.Request) {
 
 }
 
-func handleLayerGet(layerName *string, response *http.ResponseWriter, request *http.Request) error {
-	log.Printf("Querying for versions of layer %s", *layerName)
+const GetLayerVersionsRegex = `^/2018-10-31/layers/[A-Za-z0-9_-]+/versions$`
+
+func GetLayerVersions(response http.ResponseWriter, request *http.Request) {
+	layerName := getLayerName(request.URL.Path)
 
 	ctx := request.Context()
 	db := createConnection(ctx)
 	defer db.Close()
 
-	layers, err := getAllLayerVersions(ctx, db, *layerName)
+	layers, err := getAllLayerVersions(ctx, db, layerName)
 	if err != nil {
-		return err
+		http.Error(response, err.Error(), http.StatusInternalServerError)
 	}
 
 	result := lambda.ListLayerVersionsOutput{
@@ -51,12 +58,11 @@ func handleLayerGet(layerName *string, response *http.ResponseWriter, request *h
 		NextMarker:    nil,
 	}
 
-	err = json.NewEncoder(*response).Encode(result)
+	err = json.NewEncoder(response).Encode(result)
 	if err != nil {
-		return fmt.Errorf("unable to return mashalled response for %+v: %v", result, err)
+		msg := fmt.Sprintf("unable to return mashalled response for %+v: %v", result, err)
+		http.Error(response, msg, http.StatusInternalServerError)
 	}
-
-	return nil
 }
 
 func layersToAwsLayers(layers []LambdaLayer) []types.LayerVersionsListItem {
@@ -78,14 +84,18 @@ func layersToAwsLayers(layers []LambdaLayer) []types.LayerVersionsListItem {
 	return results
 }
 
-func handleLayerPost(layerName *string, response *http.ResponseWriter, request *http.Request) error {
+const PostLayerVersionsRegex = `^/2018-10-31/layers/[A-Za-z0-9_-]+/versions$`
+
+func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
+	layerName := getLayerName(request.URL.Path)
 	dec := json.NewDecoder(request.Body)
 
 	var body lambda.PublishLayerVersionInput
 	err := dec.Decode(&body)
 
 	if err != nil {
-		return fmt.Errorf("problem parsing request for Lambda layer %s: %v", *layerName, err)
+		msg := fmt.Sprintf("problem parsing request for Lambda layer %s: %v", layerName, err)
+		http.Error(response, msg, http.StatusInternalServerError)
 	}
 
 	log.Printf("Layer description: %s", *body.Description)
@@ -95,35 +105,38 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 	db := createConnection(ctx)
 	defer db.Close()
 
-	version, err := getLatestLayerVersion(ctx, db, *layerName)
+	version, err := getLatestLayerVersion(ctx, db, layerName)
 	switch {
 	case err == sql.ErrNoRows:
 		version = -1
 	case err != nil:
-		return fmt.Errorf("error when listing versions for %s: %v", *layerName, err)
+		msg := fmt.Sprintf("error when listing versions for %s: %v", layerName, err)
+		log.Print(msg)
+		http.Error(response, msg, http.StatusInternalServerError)
 	}
 
-	log.Printf("Found latest verion for layer %s: %v", *layerName, version)
+	log.Printf("Found latest verion for layer %s: %v", layerName, version)
 	log.Printf("Decompressing %d bytes from zipfile", len(body.Content.ZipFile))
 
 	layer := LambdaLayer{
-		Name:               *layerName,
+		Name:               layerName,
 		Version:            version + 1,
 		Description:        *body.Description,
 		CompatibleRuntimes: body.CompatibleRuntimes,
 	}
 
 	destPath := layer.getDestPath()
-	log.Printf("Saving layer %s to %s...", *layerName, destPath)
+	log.Printf("Saving layer %s to %s...", layerName, destPath)
 
 	err = utils.DecompressZipFile(body.Content.ZipFile, destPath)
 	if err != nil {
-		return fmt.Errorf("error when saving layer %s: %v", *layerName, err)
+		msg := fmt.Sprintf("error when saving layer %s: %v", layerName, err)
+		http.Error(response, msg, http.StatusInternalServerError)
 	}
 
 	savedLayer, err := addLayer(ctx, db, layer)
 	if err != nil {
-		return err
+		http.Error(response, err.Error(), http.StatusInternalServerError)
 	}
 
 	rawHash := sha256.Sum256(body.Content.ZipFile)
@@ -145,10 +158,9 @@ func handleLayerPost(layerName *string, response *http.ResponseWriter, request *
 		Version:                 int64(savedLayer.Version),
 	}
 
-	err = json.NewEncoder(*response).Encode(result)
+	err = json.NewEncoder(response).Encode(result)
 	if err != nil {
-		return fmt.Errorf("unable to return mashalled response for %+v: %v", result, err)
+		msg := fmt.Sprintf("unable to return mashalled response for %+v: %v", result, err)
+		http.Error(response, msg, http.StatusInternalServerError)
 	}
-
-	return nil
 }

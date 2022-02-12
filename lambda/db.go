@@ -197,6 +197,7 @@ func getAllLayerVersions(ctx context.Context, db *sql.DB, name string) ([]Lambda
 		results = append(results, result)
 	}
 
+	log.Printf("returning results: %+v", results)
 	return results, nil
 }
 

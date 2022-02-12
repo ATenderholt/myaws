@@ -1,16 +1,41 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
 	"io"
 	"log"
 	"myaws/config"
 	"myaws/lambda"
 	"net/http"
+	"regexp"
 )
 
-func logHandler(writer http.ResponseWriter, r *http.Request) {
+type route struct {
+	pattern *regexp.Regexp
+	method  string
+	handler http.Handler
+}
+
+type RegexHandler struct {
+	routes []*route
+}
+
+func (h *RegexHandler) Handler(pattern string, method string, handler http.Handler) {
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		panic(err)
+	}
+	h.routes = append(h.routes, &route{regex, method, handler})
+}
+
+func (h *RegexHandler) HandleFunc(pattern string, method string, handler func(http.ResponseWriter, *http.Request)) {
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		panic(err)
+	}
+	h.routes = append(h.routes, &route{regex, method, http.HandlerFunc(handler)})
+}
+
+func (h *RegexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("--- Request %s %q ---", r.Method, r.URL.Path)
 	log.Printf("Query:")
 	for key, value := range r.URL.Query() {
@@ -22,31 +47,45 @@ func logHandler(writer http.ResponseWriter, r *http.Request) {
 		log.Printf("   %s : %s", key, value)
 	}
 
+	for _, route := range h.routes {
+		if route.pattern.MatchString(r.URL.Path) && route.method == r.Method {
+			route.handler.ServeHTTP(w, r)
+			return
+		}
+	}
+
+	log.Printf(" ---- %s %s NOT HANDLED BY REGEX --- ", r.Method, r.URL.Path)
 	body, _ := io.ReadAll(r.Body)
 	log.Printf("Body: %s", body)
 
-	url := fmt.Sprintf("%s://%s%s", "http", "localhost:9324", r.RequestURI)
+	//url := fmt.Sprintf("%s://%s%s", "http", "localhost:9324", r.RequestURI)
 
-	proxyReq, _ := http.NewRequest(r.Method, url, bytes.NewReader(body))
-	proxyReq.Header = r.Header
+	//proxyReq, _ := http.NewRequest(r.Method, url, bytes.NewReader(body))
+	//proxyReq.Header = r.Header
 
-	client := &http.Client{}
-	resp, err := client.Do(proxyReq)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusBadGateway)
-		return
-	}
+	//client := &http.Client{}
+	//resp, err := client.Do(proxyReq)
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusBadGateway)
+	//	return
+	//}
 
-	defer resp.Body.Close()
-	writer.WriteHeader(resp.StatusCode)
-	io.Copy(writer, resp.Body)
+	http.NotFound(w, r)
+
+	//defer resp.Body.Close()
+	//w.WriteHeader(resp.StatusCode)
+	//io.Copy(w, resp.Body)
 }
 
 func main() {
 	settings := config.GetSettings()
 	log.Printf("Settings: %+v", *settings)
 
-	http.HandleFunc("/2018-10-31/layers/", lambda.LayerHandler)
-	http.HandleFunc("/", logHandler)
+	handler := RegexHandler{}
+	handler.HandleFunc(lambda.GetLayerVersionsRegex, http.MethodGet, lambda.GetLayerVersions)
+	handler.HandleFunc(lambda.PostLayerVersionsRegex, http.MethodPost, lambda.PostLayerVersions)
+
+	http.Handle("/", &handler)
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

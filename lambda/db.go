@@ -201,6 +201,39 @@ func getAllLayerVersions(ctx context.Context, db *sql.DB, name string) ([]Lambda
 	return results, nil
 }
 
+func getLayerVersion(ctx context.Context, db *sql.DB, name string, version int) (LambdaLayer, error) {
+	var result LambdaLayer
+	var createdOn int64
+	var runtimes string
+
+	query := `
+SELECT ll.id, ll.name, ll.description, ll.version, ll.created_on, GROUP_CONCAT(r.name) AS runtimes
+FROM lambda_runtime AS r
+INNER JOIN lambda_layer_runtime llr ON r.id = llr.lambda_runtime_id
+INNER JOIN lambda_layer ll ON llr.lambda_layer_id = ll.id
+WHERE ll.name = ? AND ll.version = ?
+GROUP BY llr.lambda_layer_id;
+`
+	err := db.QueryRowContext(ctx, query, name, version).Scan(
+		&result.ID,
+		&result.Name,
+		&result.Description,
+		&result.Version,
+		&createdOn,
+		&runtimes,
+	)
+
+	if err != nil {
+		return result, fmt.Errorf("problem parsing results when querying version %d for layer %s: %v",
+			version, name, err)
+	}
+
+	result.CreatedOn = time.UnixMilli(createdOn).Format("2006-01-02T15:04:05.999-0700")
+	result.CompatibleRuntimes = stringToRuntimes(runtimes)
+
+	return result, nil
+}
+
 func stringToRuntimes(runtime string) []types.Runtime {
 	log.Printf("converting %s to list of runtimes", runtime)
 	split := strings.Split(runtime, ",")

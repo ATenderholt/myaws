@@ -10,6 +10,7 @@ import (
 	"log"
 	"myaws/utils"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -18,30 +19,9 @@ func getLayerName(path string) string {
 	return parts[3]
 }
 
-func LayerHandler(response http.ResponseWriter, request *http.Request) {
-	log.Printf("--- Request %s %q ---", request.Method, request.URL.Path)
+const GetAllLayerVersionsRegex = `^/2018-10-31/layers/[A-Za-z0-9_-]+/versions$`
 
-	parts := strings.Split(request.URL.Path, "/")
-	layerName := parts[3]
-
-	log.Printf("Processing for Lambda layer name '%s'", layerName)
-	var err error
-	switch request.Method {
-	//case "GET":
-	//	err = getLayerVersions(response, request)
-	//case "POST":
-	//	err = handleLayerPost(&layerName, &response, request)
-	}
-
-	if err != nil {
-		http.Error(response, err.Error(), http.StatusInternalServerError)
-	}
-
-}
-
-const GetLayerVersionsRegex = `^/2018-10-31/layers/[A-Za-z0-9_-]+/versions$`
-
-func GetLayerVersions(response http.ResponseWriter, request *http.Request) {
+func GetAllLayerVersions(response http.ResponseWriter, request *http.Request) {
 	layerName := getLayerName(request.URL.Path)
 
 	ctx := request.Context()
@@ -56,6 +36,45 @@ func GetLayerVersions(response http.ResponseWriter, request *http.Request) {
 	result := lambda.ListLayerVersionsOutput{
 		LayerVersions: layersToAwsLayers(layers),
 		NextMarker:    nil,
+	}
+
+	err = json.NewEncoder(response).Encode(result)
+	if err != nil {
+		msg := fmt.Sprintf("unable to return mashalled response for %+v: %v", result, err)
+		http.Error(response, msg, http.StatusInternalServerError)
+	}
+}
+
+func getLayerNameAndVersion(path string) (string, int) {
+	parts := strings.Split(path, "/")
+	version, _ := strconv.Atoi(parts[5])
+	return parts[3], version
+}
+
+const GetLayerVersionsRegex = `^/2018-10-31/layers/[A-Za-z0-9_-]+/versions/\d+$`
+
+func GetLayerVersion(response http.ResponseWriter, request *http.Request) {
+	layerName, version := getLayerNameAndVersion(request.URL.Path)
+
+	ctx := request.Context()
+	db := createConnection(ctx)
+	defer db.Close()
+
+	layer, err := getLayerVersion(ctx, db, layerName, version)
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusInternalServerError)
+	}
+
+	result := lambda.GetLayerVersionOutput{
+		CompatibleArchitectures: nil,
+		CompatibleRuntimes:      layer.CompatibleRuntimes,
+		Content:                 &types.LayerVersionContentOutput{},
+		CreatedDate:             &layer.CreatedOn,
+		Description:             &layer.Description,
+		LayerArn:                layer.getArn(),
+		LayerVersionArn:         layer.getVersionArn(),
+		LicenseInfo:             nil,
+		Version:                 int64(layer.Version),
 	}
 
 	err = json.NewEncoder(response).Encode(result)

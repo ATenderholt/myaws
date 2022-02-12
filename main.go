@@ -82,7 +82,8 @@ func main() {
 	log.Printf("Settings: %+v", *settings)
 
 	handler := RegexHandler{}
-	handler.HandleFunc(lambda.GetLayerVersionsRegex, http.MethodGet, lambda.GetLayerVersions)
+	handler.HandleFunc(lambda.GetAllLayerVersionsRegex, http.MethodGet, lambda.GetAllLayerVersions)
+	handler.HandleFunc(lambda.GetLayerVersionsRegex, http.MethodGet, lambda.GetLayerVersion)
 	handler.HandleFunc(lambda.PostLayerVersionsRegex, http.MethodPost, lambda.PostLayerVersions)
 
 	http.Handle("/", &handler)

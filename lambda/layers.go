@@ -39,11 +39,7 @@ func GetAllLayerVersions(response http.ResponseWriter, request *http.Request) {
 		NextMarker:    nil,
 	}
 
-	err = json.NewEncoder(response).Encode(result)
-	if err != nil {
-		msg := fmt.Sprintf("unable to return mashalled response for %+v: %v", result, err)
-		http.Error(response, msg, http.StatusInternalServerError)
-	}
+	utils.RespondWithJson(response, result)
 }
 
 func getLayerNameAndVersion(path string) (string, int) {
@@ -81,27 +77,13 @@ func GetLayerVersion(response http.ResponseWriter, request *http.Request) {
 		Version:         int64(layer.Version),
 	}
 
-	err = json.NewEncoder(response).Encode(result)
-	if err != nil {
-		msg := fmt.Sprintf("unable to return mashalled response for %+v: %v", result, err)
-		http.Error(response, msg, http.StatusInternalServerError)
-	}
+	utils.RespondWithJson(response, result)
 }
 
 func layersToAwsLayers(layers []LambdaLayer) []types.LayerVersionsListItem {
 	results := make([]types.LayerVersionsListItem, len(layers))
 	for i, layer := range layers {
-		result := types.LayerVersionsListItem{
-			CompatibleArchitectures: []types.Architecture{},
-			CompatibleRuntimes:      layer.CompatibleRuntimes,
-			CreatedDate:             &layer.CreatedOn,
-			Description:             &layer.Description,
-			LayerVersionArn:         layer.getVersionArn(),
-			LicenseInfo:             nil,
-			Version:                 int64(layer.Version),
-		}
-
-		results[i] = result
+		results[i] = layer.toLayerVersionsListItem()
 	}
 
 	return results
@@ -167,24 +149,7 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 		http.Error(response, err.Error(), http.StatusInternalServerError)
 	}
 
-	result := lambda.PublishLayerVersionOutput{
-		CompatibleArchitectures: []types.Architecture{},
-		CompatibleRuntimes:      savedLayer.CompatibleRuntimes,
-		Content: &types.LayerVersionContentOutput{
-			CodeSize:   savedLayer.CodeSize,
-			CodeSha256: &savedLayer.CodeSha256,
-		},
-		CreatedDate:     &savedLayer.CreatedOn,
-		Description:     &savedLayer.Description,
-		LayerArn:        savedLayer.getArn(),
-		LayerVersionArn: savedLayer.getVersionArn(),
-		LicenseInfo:     nil,
-		Version:         int64(savedLayer.Version),
-	}
+	result := savedLayer.toPublishLayerVersionOutput()
 
-	err = json.NewEncoder(response).Encode(result)
-	if err != nil {
-		msg := fmt.Sprintf("unable to return mashalled response for %+v: %v", result, err)
-		http.Error(response, msg, http.StatusInternalServerError)
-	}
+	utils.RespondWithJson(response, result)
 }

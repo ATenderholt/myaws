@@ -1,11 +1,14 @@
-package lambda
+package types
 
 import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"myaws/config"
 	"path/filepath"
 	"strconv"
 )
+
+var settings = config.GetSettings()
 
 type LambdaLayer struct {
 	ID                 int64
@@ -18,23 +21,23 @@ type LambdaLayer struct {
 	CodeSha256         string
 }
 
-func (layer LambdaLayer) getDestPath() string {
+func (layer LambdaLayer) GetDestPath() string {
 	return filepath.Join(settings.GetDataPath(), "lambda", "layers", layer.Name,
 		strconv.Itoa(layer.Version), "content")
 }
 
-func (layer LambdaLayer) getArn() *string {
+func (layer LambdaLayer) GetArn() *string {
 	result := "arn:aws:lambda:" + settings.GetArnFragment() + ":layer:" + layer.Name
 	return &result
 }
 
-func (layer LambdaLayer) getVersionArn() *string {
-	arn := layer.getArn()
+func (layer LambdaLayer) GetVersionArn() *string {
+	arn := layer.GetArn()
 	result := *arn + ":" + strconv.Itoa(layer.Version)
 	return &result
 }
 
-func (layer LambdaLayer) toPublishLayerVersionOutput() *lambda.PublishLayerVersionOutput {
+func (layer LambdaLayer) ToPublishLayerVersionOutput() *lambda.PublishLayerVersionOutput {
 	return &lambda.PublishLayerVersionOutput{
 		CompatibleArchitectures: []types.Architecture{},
 		CompatibleRuntimes:      layer.CompatibleRuntimes,
@@ -44,20 +47,20 @@ func (layer LambdaLayer) toPublishLayerVersionOutput() *lambda.PublishLayerVersi
 		},
 		CreatedDate:     &layer.CreatedOn,
 		Description:     &layer.Description,
-		LayerArn:        layer.getArn(),
-		LayerVersionArn: layer.getVersionArn(),
+		LayerArn:        layer.GetArn(),
+		LayerVersionArn: layer.GetVersionArn(),
 		LicenseInfo:     nil,
 		Version:         int64(layer.Version),
 	}
 }
 
-func (layer LambdaLayer) toLayerVersionsListItem() types.LayerVersionsListItem {
+func (layer LambdaLayer) ToLayerVersionsListItem() types.LayerVersionsListItem {
 	return types.LayerVersionsListItem{
 		CompatibleArchitectures: []types.Architecture{},
 		CompatibleRuntimes:      layer.CompatibleRuntimes,
 		CreatedDate:             &layer.CreatedOn,
 		Description:             &layer.Description,
-		LayerVersionArn:         layer.getVersionArn(),
+		LayerVersionArn:         layer.GetVersionArn(),
 		LicenseInfo:             nil,
 		Version:                 int64(layer.Version),
 	}

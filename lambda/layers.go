@@ -101,6 +101,7 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		msg := fmt.Sprintf("problem parsing request for Lambda layer %s: %v", layerName, err)
 		http.Error(response, msg, http.StatusInternalServerError)
+		return
 	}
 
 	log.Printf("Layer description: %s", *body.Description)
@@ -118,6 +119,7 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 		msg := fmt.Sprintf("error when listing versions for %s: %v", layerName, err)
 		log.Print(msg)
 		http.Error(response, msg, http.StatusInternalServerError)
+		return
 	}
 
 	log.Printf("Found latest verion for layer %s: %v", layerName, version)
@@ -142,11 +144,13 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		msg := fmt.Sprintf("error when saving layer %s: %v", layerName, err)
 		http.Error(response, msg, http.StatusInternalServerError)
+		return
 	}
 
 	savedLayer, err := addLayer(ctx, db, layer)
 	if err != nil {
 		http.Error(response, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	result := savedLayer.toPublishLayerVersionOutput()

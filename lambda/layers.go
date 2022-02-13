@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"log"
+	"myaws/database"
 	"myaws/utils"
 	"net/http"
 	"strconv"
@@ -26,7 +27,7 @@ func GetAllLayerVersions(response http.ResponseWriter, request *http.Request) {
 	layerName := getLayerName(request.URL.Path)
 
 	ctx := request.Context()
-	db := createConnection(ctx)
+	db := database.CreateConnection()
 	defer db.Close()
 
 	layers, err := getAllLayerVersions(ctx, db, layerName)
@@ -54,7 +55,7 @@ func GetLayerVersion(response http.ResponseWriter, request *http.Request) {
 	layerName, version := getLayerNameAndVersion(request.URL.Path)
 
 	ctx := request.Context()
-	db := createConnection(ctx)
+	db := database.CreateConnection()
 	defer db.Close()
 
 	layer, err := getLayerVersion(ctx, db, layerName, version)
@@ -108,7 +109,7 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 	log.Printf("Layer runtimes: %v", body.CompatibleRuntimes)
 
 	ctx := request.Context()
-	db := createConnection(ctx)
+	db := database.CreateConnection()
 	defer db.Close()
 
 	version, err := getLatestLayerVersion(ctx, db, layerName)

@@ -2,9 +2,10 @@ package main
 
 import (
 	"io"
-	"log"
 	"myaws/config"
+	"myaws/database"
 	"myaws/lambda"
+	"myaws/log"
 	"net/http"
 	"regexp"
 )
@@ -36,15 +37,15 @@ func (h *RegexHandler) HandleFunc(pattern string, method string, handler func(ht
 }
 
 func (h *RegexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("--- Request %s %q ---", r.Method, r.URL.Path)
-	log.Printf("Query:")
+	log.Info("--- Request %s %q ---", r.Method, r.URL.Path)
+	log.Info("Query:")
 	for key, value := range r.URL.Query() {
-		log.Printf("    %s = %s", key, value)
+		log.Info("    %s = %s", key, value)
 	}
 
-	log.Print("Headers:")
+	log.Info("Headers:")
 	for key, value := range r.Header {
-		log.Printf("   %s : %s", key, value)
+		log.Info("   %s : %s", key, value)
 	}
 
 	for _, route := range h.routes {
@@ -54,9 +55,9 @@ func (h *RegexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf(" ---- %s %s NOT HANDLED BY REGEX --- ", r.Method, r.URL.Path)
+	log.Info(" ---- %s %s NOT HANDLED BY REGEX --- ", r.Method, r.URL.Path)
 	body, _ := io.ReadAll(r.Body)
-	log.Printf("Body: %s", body)
+	log.Info("Body: %s", body)
 
 	//url := fmt.Sprintf("%s://%s%s", "http", "localhost:9324", r.RequestURI)
 
@@ -79,7 +80,9 @@ func (h *RegexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	settings := config.GetSettings()
-	log.Printf("Settings: %+v", *settings)
+	log.Info("Settings: %+v", *settings)
+
+	initializeDb()
 
 	handler := RegexHandler{}
 	handler.HandleFunc(lambda.GetAllLayerVersionsRegex, http.MethodGet, lambda.GetAllLayerVersions)
@@ -88,5 +91,13 @@ func main() {
 
 	http.Handle("/", &handler)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Panic(http.ListenAndServe(":8080", nil).Error())
+}
+
+func initializeDb() {
+	var migrations database.Migrations
+	migrations.AddAll(lambda.Migrations)
+
+	log.Info("Initializing DB with %d Migrations.", migrations.Size())
+	database.Initialize(migrations)
 }

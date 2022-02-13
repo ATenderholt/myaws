@@ -11,7 +11,7 @@ import (
 
 func CreateConnection() *sql.DB {
 	settings := config.GetSettings()
-	dbPath := filepath.Join(settings.GetDataPath(), "db.sqlite3")
+	dbPath := filepath.Join(settings.GetDataPath(), "database.sqlite3")
 	connStr := fmt.Sprintf("file:%s", dbPath)
 
 	db, err := sql.Open("sqlite3", connStr)
@@ -21,7 +21,7 @@ func CreateConnection() *sql.DB {
 
 	err = db.Ping()
 	if err != nil {
-		panic(SqlError{"unable to ping db", err})
+		panic(SqlError{"unable to ping database", err})
 	}
 
 	return db

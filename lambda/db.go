@@ -6,22 +6,53 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"log"
-	"myaws/utils"
+	"myaws/database"
 	"strings"
 	"time"
 )
 
-const createLayerTable = `
-CREATE TABLE IF NOT EXISTS lambda_layer (
-	id           integer primary key autoincrement,
-    name         text not null,
-    description  text not null,
-	version      integer not null,
-	created_on   integer not null,
-	code_size	 integer not null,
-	code_sha256  text not null
-);
-`
+var Migrations = []database.Migration{
+	{
+		Service:     "Lambda",
+		Description: "Create Layer Table",
+		Query: `CREATE TABLE IF NOT EXISTS lambda_layer (
+					id           integer primary key autoincrement,
+					name         text not null,
+					description  text not null,
+					version      integer not null,
+					created_on   integer not null,
+					code_size	 integer not null,
+					code_sha256  text not null
+				);
+		`,
+	},
+	{
+		Service:     "Lambda",
+		Description: "Create Runtime Table",
+		Query: `CREATE TABLE IF NOT EXISTS lambda_runtime (
+					id      integer primary key autoincrement,
+					name	text not null unique
+				);
+			
+				INSERT OR IGNORE INTO lambda_runtime (name) VALUES
+				('python3.6'),
+				('python3.7'),
+				('python3.8');
+		`,
+	},
+	{
+		Service:     "Lambda",
+		Description: "Create Layer Runtime Table",
+		Query: `CREATE TABLE IF NOT EXISTS lambda_layer_runtime (
+					id					integer primary key autoincrement,
+					lambda_layer_id		integer,
+					lambda_runtime_id	integer,
+					FOREIGN KEY(lambda_layer_id) REFERENCES lambda_layer(id),
+					FOREIGN	KEY(lambda_runtime_id) REFERENCES lambda_runtime(id)
+				);
+		`,
+	},
+}
 
 const insertLayer = `
 INSERT INTO lambda_layer (name, description, version, created_on, code_size, code_sha256)
@@ -42,30 +73,8 @@ WHERE ll.name = ?
 GROUP BY llr.lambda_layer_id;
 `
 
-const createRuntimeTable = `
-CREATE TABLE IF NOT EXISTS lambda_runtime (
-	id      integer primary key autoincrement,
-	name	text not null unique
-);
-
-INSERT OR IGNORE INTO lambda_runtime (name) VALUES
-('python3.6'),
-('python3.7'),
-('python3.8');
-`
-
 const queryRuntime = `
 SELECT id, name from lambda_runtime WHERE name = ?
-`
-
-const createLayerRuntimeTable = `
-CREATE TABLE IF NOT EXISTS lambda_layer_runtime (
-	id					integer primary key autoincrement,
-	lambda_layer_id		integer,
-	lambda_runtime_id	integer,
-	FOREIGN KEY(lambda_layer_id) REFERENCES lambda_layer(id),
-	FOREIGN	KEY(lambda_runtime_id) REFERENCES lambda_runtime(id)
-);
 `
 
 const insertLayerRuntime = `
@@ -73,29 +82,7 @@ INSERT INTO lambda_layer_runtime (lambda_layer_id, lambda_runtime_id)
 VALUES (?, ?)
 `
 
-func createConnection(ctx context.Context) *sql.DB {
-	db := utils.CreateConnection()
-	_, err := db.ExecContext(ctx, createLayerTable)
-	if err != nil {
-		panic(utils.SqlError{Message: "unable to create lambda_layer table", Err: err})
-	}
-
-	_, err = db.ExecContext(ctx, createRuntimeTable)
-	if err != nil {
-		panic(utils.SqlError{Message: "unable to create lambda_runtime table", Err: err})
-	}
-
-	_, err = db.ExecContext(ctx, createLayerRuntimeTable)
-	if err != nil {
-		panic(utils.SqlError{Message: "unable to create lambda_layer_runtime table", Err: err})
-	}
-
-	return db
-}
-
-var txWriteOptions = sql.TxOptions{Isolation: sql.LevelDefault, ReadOnly: false}
-
-func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer, error) {
+func addLayer(ctx context.Context, db *database.Database, layer LambdaLayer) (*LambdaLayer, error) {
 	dbRuntimes, err := getLayerRuntimes(ctx, db, layer.CompatibleRuntimes)
 	switch {
 	case err == sql.ErrNoRows:
@@ -104,7 +91,7 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer,
 		return nil, fmt.Errorf("error when adding runtime: %v", err)
 	}
 
-	tx, err := db.BeginTx(ctx, &txWriteOptions)
+	tx, err := db.BeginTx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transaction to add lambda layer %v: %v", layer, err)
 	}
@@ -112,7 +99,7 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer,
 	log.Printf("Inserting lambda layer %+v", layer)
 
 	createdOn := time.Now()
-	layerId, err := utils.InsertOne(tx, ctx, insertLayer,
+	layerId, err := tx.InsertOne(ctx, insertLayer,
 		layer.Name,
 		layer.Description,
 		layer.Version,
@@ -127,17 +114,16 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer,
 
 	stmt, err := tx.PrepareContext(ctx, insertLayerRuntime)
 	if err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("unable to prepare statement for inserting layer runtimes for %s: %v", layer.Name,
-			err)
+		msg := tx.Rollback("unable to prepare statement for inserting layer runtimes for %s: %v", layer.Name, err)
+		return nil, fmt.Errorf(msg)
 	}
 
 	for runtimeName, runtimeId := range dbRuntimes {
 		log.Printf("Trying to insert runtime %s for layer %s", runtimeName, layer.Name)
 		_, err := stmt.ExecContext(ctx, layerId, runtimeId)
 		if err != nil {
-			tx.Rollback()
-			return nil, fmt.Errorf("unable to insert runtime %s for layer %s: %v", runtimeName, layer.Name, err)
+			msg := tx.Rollback("unable to insert runtime %s for layer %s: %v", runtimeName, layer.Name, err)
+			return nil, fmt.Errorf(msg)
 		}
 	}
 
@@ -160,7 +146,7 @@ func addLayer(ctx context.Context, db *sql.DB, layer LambdaLayer) (*LambdaLayer,
 	return &result, nil
 }
 
-func getLayerRuntimes(ctx context.Context, db *sql.DB, runtimes []types.Runtime) (map[types.Runtime]int, error) {
+func getLayerRuntimes(ctx context.Context, db *database.Database, runtimes []types.Runtime) (map[types.Runtime]int, error) {
 	results := make(map[types.Runtime]int, len(runtimes))
 	var resultError error = nil
 	for _, runtime := range runtimes {
@@ -183,7 +169,7 @@ func getLayerRuntimes(ctx context.Context, db *sql.DB, runtimes []types.Runtime)
 	return results, resultError
 }
 
-func getAllLayerVersions(ctx context.Context, db *sql.DB, name string) ([]LambdaLayer, error) {
+func getAllLayerVersions(ctx context.Context, db *database.Database, name string) ([]LambdaLayer, error) {
 	var results []LambdaLayer
 	rows, err := db.QueryContext(ctx, queryAllVersionsByLayerName, name)
 	switch {
@@ -215,7 +201,7 @@ func getAllLayerVersions(ctx context.Context, db *sql.DB, name string) ([]Lambda
 	return results, nil
 }
 
-func getLayerVersion(ctx context.Context, db *sql.DB, name string, version int) (LambdaLayer, error) {
+func getLayerVersion(ctx context.Context, db *database.Database, name string, version int) (LambdaLayer, error) {
 	var result LambdaLayer
 	var createdOn int64
 	var runtimes string
@@ -262,7 +248,7 @@ func stringToRuntimes(runtime string) []types.Runtime {
 	return runtimes
 }
 
-func getLatestLayerVersion(ctx context.Context, db *sql.DB, name string) (int, error) {
+func getLatestLayerVersion(ctx context.Context, db *database.Database, name string) (int, error) {
 	var dbName sql.NullString
 	var dbVersion sql.NullInt32
 	err := db.QueryRowContext(ctx, queryLatestVersionByLayerName, name).Scan(&dbName, &dbVersion)

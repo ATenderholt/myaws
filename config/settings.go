@@ -8,6 +8,7 @@ import (
 type Settings struct {
 	accountNumber string
 	dataPath      string
+	debug         bool
 	region        string
 }
 
@@ -18,6 +19,7 @@ func GetSettings() *Settings {
 	once.Do(func() {
 		instance = Settings{}
 		flag.StringVar(&instance.dataPath, "data-path", "data", "Path to data directory")
+		flag.BoolVar(&instance.debug, "debug", false, "Enable trace debugging")
 		flag.Parse()
 
 		instance.accountNumber = "000000000000"
@@ -33,4 +35,8 @@ func (settings *Settings) GetDataPath() string {
 
 func (settings *Settings) GetArnFragment() string {
 	return settings.region + ":" + settings.accountNumber
+}
+
+func (settings *Settings) IsDebug() bool {
+	return settings.debug
 }

@@ -71,10 +71,10 @@ func (migration Migration) apply(db *Database) {
 
 	switch {
 	case err == sql.ErrNoRows:
-		log.Info("...Migration %v needs to be applied.", migration)
+		log.Info("... Migration %v needs to be applied.", migration)
 		needsApplying = true
 	case err != nil:
-		log.Panic("...error when searching for Migration %v: %v.", migration, err)
+		log.Panic("... error when searching for Migration %v: %v.", migration, err)
 	}
 
 	if !needsApplying && hash != dbHash {
@@ -83,7 +83,7 @@ func (migration Migration) apply(db *Database) {
 	}
 
 	if !needsApplying {
-		log.Info("...Migration %v already applied.", migration)
+		log.Info("... Migration %v already applied.", migration)
 		return
 	}
 
@@ -92,9 +92,9 @@ func (migration Migration) apply(db *Database) {
 	_, err = db.Exec(migration.Query)
 	applied := false
 	if err != nil {
-		log.Error("...unable to apply Migration %v: %v", migration, err)
+		log.Error("... unable to apply Migration %v: %v", migration, err)
 	} else {
-		log.Info("....Migration %v applied.", migration)
+		log.Info(".... Migration %v applied.", migration)
 		applied = true
 	}
 

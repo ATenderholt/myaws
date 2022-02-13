@@ -8,6 +8,8 @@ import (
 	"myaws/log"
 	"net/http"
 	"regexp"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type route struct {

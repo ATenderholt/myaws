@@ -4,7 +4,7 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"log"
+	"myaws/log"
 	"os"
 	"path/filepath"
 )
@@ -19,7 +19,7 @@ func min(a int, b int64) int64 {
 }
 
 func (source ZipContent) ReadAt(p []byte, off int64) (n int, err error) {
-	log.Printf("Attempting to read %d bytes from offset %d", len(p), off)
+	log.Debug("Attempting to read %d bytes from offset %d", len(p), off)
 
 	if off >= source.Length {
 		return 0, io.EOF
@@ -36,7 +36,7 @@ func (source ZipContent) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func createDirs(dirPath string) {
-	log.Printf("Creating directory if necessary %s ...", dirPath)
+	log.Debug("Creating directory if necessary %s ...", dirPath)
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		panic(ZipFileError{"unable to create directory", dirPath, err})
@@ -74,7 +74,7 @@ func DecompressZipFile(bytes []byte, destPath string) (returnError error) {
 		if e := recover(); e != nil {
 			// cleanup?
 			err := e.(ZipFileError)
-			log.Printf(err.Error())
+			log.Error(err.Error())
 			returnError = err
 		}
 	}()
@@ -89,7 +89,7 @@ func DecompressZipFile(bytes []byte, destPath string) (returnError error) {
 			createDirs(filepath.Dir(filePath))
 		}
 
-		log.Printf("Saving %s ...", filePath)
+		log.Info("Saving %s ...", filePath)
 		saveFile(filePath, *f)
 
 	}

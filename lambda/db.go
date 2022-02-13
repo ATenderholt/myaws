@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"log"
 	"myaws/database"
+	"myaws/log"
 	"strings"
 	"time"
 )
@@ -96,7 +96,7 @@ func addLayer(ctx context.Context, db *database.Database, layer LambdaLayer) (*L
 		return nil, fmt.Errorf("unable to create transaction to add lambda layer %v: %v", layer, err)
 	}
 
-	log.Printf("Inserting lambda layer %+v", layer)
+	log.Info("Inserting Lambda Layer %+v", layer)
 
 	createdOn := time.Now()
 	layerId, err := tx.InsertOne(ctx, insertLayer,
@@ -119,7 +119,7 @@ func addLayer(ctx context.Context, db *database.Database, layer LambdaLayer) (*L
 	}
 
 	for runtimeName, runtimeId := range dbRuntimes {
-		log.Printf("Trying to insert runtime %s for layer %s", runtimeName, layer.Name)
+		log.Debug("Trying to insert runtime %s for layer %s", runtimeName, layer.Name)
 		_, err := stmt.ExecContext(ctx, layerId, runtimeId)
 		if err != nil {
 			msg := tx.Rollback("unable to insert runtime %s for layer %s: %v", runtimeName, layer.Name, err)
@@ -155,13 +155,13 @@ func getLayerRuntimes(ctx context.Context, db *database.Database, runtimes []typ
 		err := db.QueryRowContext(ctx, queryRuntime, runtime).Scan(&id, &name)
 		switch {
 		case err == sql.ErrNoRows:
-			log.Printf("unable to find Layer Runtime %s", runtime)
+			log.Error("unable to find Layer Runtime %s", runtime)
 			resultError = sql.ErrNoRows
 			results[runtime] = -1
 		case err != nil:
 			return nil, fmt.Errorf("error when querying runtime %s", runtime)
 		default:
-			log.Printf("Found Layer Runtime id=%d name=%s", id, name)
+			log.Info("Found Layer Runtime id=%d name=%s", id, name)
 			results[runtime] = id
 		}
 	}
@@ -193,11 +193,11 @@ func getAllLayerVersions(ctx context.Context, db *database.Database, name string
 		result.CreatedOn = time.UnixMilli(createdOn).Format("2006-01-02T15:04:05.999-0700")
 		result.CompatibleRuntimes = stringToRuntimes(runtimes)
 
-		log.Printf("got row when querying lambda layer %s: %+v", name, result)
+		log.Info("got row when querying lambda layer %s: %+v", name, result)
 		results = append(results, result)
 	}
 
-	log.Printf("returning results: %+v", results)
+	log.Info("returning results: %+v", results)
 	return results, nil
 }
 
@@ -238,7 +238,7 @@ GROUP BY llr.lambda_layer_id;
 }
 
 func stringToRuntimes(runtime string) []types.Runtime {
-	log.Printf("converting %s to list of runtimes", runtime)
+	log.Debug("converting %s to list of runtimes", runtime)
 	split := strings.Split(runtime, ",")
 	runtimes := make([]types.Runtime, len(split))
 	for i, value := range split {

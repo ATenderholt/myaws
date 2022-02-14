@@ -13,7 +13,7 @@ type Function struct {
 	Handler       string
 	Role          string
 	DeadLetterArn string
-	LayerArns     []string
+	Layers        []LambdaLayer
 	MemorySize    int32
 	Runtime       aws.Runtime
 	Timeout       int32
@@ -39,10 +39,6 @@ type Function struct {
 
 	// The reason code for the last update that was performed on the function.
 	LastUpdateStatusReasonCode aws.LastUpdateStatusReasonCode
-
-	// The function's  layers
-	// (https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html).
-	Layers []aws.Layer
 
 	// The type of deployment package. Set to Image for container image and set Zip for
 	// .zip file archive.
@@ -87,7 +83,7 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 		LastUpdateStatus:           "",
 		LastUpdateStatusReason:     nil,
 		LastUpdateStatusReasonCode: "",
-		Layers:                     nil,
+		Layers:                     layersToAws(f.Layers),
 		MasterArn:                  nil,
 		MemorySize:                 &f.MemorySize,
 		PackageType:                "Zip",
@@ -105,4 +101,16 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 		VpcConfig:                  nil,
 		ResultMetadata:             middleware.Metadata{},
 	}
+}
+
+func layersToAws(layers []LambdaLayer) []aws.Layer {
+	results := make([]aws.Layer, len(layers))
+	for i, layer := range layers {
+		results[i] = aws.Layer{
+			Arn:      layer.GetVersionArn(),
+			CodeSize: layer.CodeSize,
+		}
+	}
+
+	return results
 }

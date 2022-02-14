@@ -27,7 +27,17 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	log.Info("Creating lambda function %s", body.FunctionName)
+	content := body.Code
+	body.Code = nil
+	log.Info("Creating lambda function %+v", body)
+
+	err = utils.DecompressZipFile(content.ZipFile, "")
+	if err != nil {
+		msg := fmt.Sprintf("error when saving function %s: %v", body.FunctionName, err)
+		log.Error(msg)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
+	}
 
 	ctx := request.Context()
 	db := database.CreateConnection()
@@ -55,13 +65,18 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 
 	version := strconv.Itoa(dbVersion + 1)
 
+	var deadLetterArn string
+	if body.DeadLetterConfig != nil {
+		deadLetterArn = *body.DeadLetterConfig.TargetArn
+	}
+
 	function := types.Function{
 		FunctionName:  *body.FunctionName,
 		Description:   *body.Description,
 		Handler:       *body.Handler,
 		Role:          *body.Role,
-		DeadLetterArn: *body.DeadLetterConfig.TargetArn,
-		LayerArns:     body.Layers,
+		DeadLetterArn: deadLetterArn,
+		Layers:        nil, // TODO : body.Layers,
 		MemorySize:    *body.MemorySize,
 		Runtime:       body.Runtime,
 		Timeout:       *body.Timeout,

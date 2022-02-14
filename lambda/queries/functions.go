@@ -48,7 +48,7 @@ func InsertFunction(ctx context.Context, db *database.Database, function *types.
 
 	functionId, err := tx.InsertOne(
 		ctx,
-		`INSERT INTO lambda_function (function_name, version, description, handler, role, dead_letter_arn,
+		`INSERT INTO lambda_function (name, version, description, handler, role, dead_letter_arn,
 					memory_size, runtime, timeout, code_sha256, code_size, lsat_modified_on)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
@@ -114,7 +114,6 @@ func InsertFunction(ctx context.Context, db *database.Database, function *types.
 		Handler:                    function.Handler,
 		Role:                       function.Role,
 		DeadLetterArn:              function.DeadLetterArn,
-		LayerArns:                  function.LayerArns,
 		MemorySize:                 function.MemorySize,
 		Runtime:                    function.Runtime,
 		Timeout:                    function.Timeout,

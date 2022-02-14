@@ -48,7 +48,7 @@ var Migrations = []database.Migration{
 		Description: "Create Function & supporting Tables",
 		Query: `CREATE TABLE IF NOT EXISTS lambda_function (
 					id					integer primary key autoincrement,
-					function_name		text not null,
+					name				text not null,
 					version				integer not null,
 					description			text,
 					handler				text not null,

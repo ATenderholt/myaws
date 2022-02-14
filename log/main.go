@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	base "log"
 	"myaws/config"
 	"os"
@@ -25,8 +26,10 @@ func Debug(format string, v ...interface{}) {
 	}
 }
 
-func Error(format string, v ...interface{}) {
-	err.Printf(format, v...)
+func Error(format string, v ...interface{}) string {
+	msg := fmt.Sprintf(format, v...)
+	err.Printf(msg)
+	return msg
 }
 
 func Info(format string, v ...interface{}) {

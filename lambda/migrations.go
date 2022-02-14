@@ -43,4 +43,48 @@ var Migrations = []database.Migration{
 				);
 		`,
 	},
+	{
+		Service:     "Lambda",
+		Description: "Create Function & supporting Tables",
+		Query: `CREATE TABLE IF NOT EXISTS lambda_function (
+					id					integer primary key autoincrement,
+					function_name		text not null,
+					version				integer not null,
+					description			text,
+					handler				text not null,
+					role				text,
+					dead_letter_arn		text,
+					memory_size			integer not null,
+					runtime				text not null,
+					timeout				integer not null,
+					code_sha256			text not null,
+					code_size			integer not null,
+					last_modified_on	integer not null
+				);
+
+				CREATE TABLE IF NOT EXISTS lambda_function_environment (
+					id					integer primary key autoincrement,
+					function_id 		integer not null,
+					key					text not null,
+					value				text,
+					FOREIGN KEY(function_id) REFERENCES lambda_function(id)
+				);
+
+				CREATE TABLE IF NOT EXISTS lambda_function_tag (
+					id					integer primary key autoincrement,
+					function_id 		integer not null,
+					key					text not null,
+					value				text,
+					FOREIGN KEY(function_id) REFERENCES lambda_function(id)
+				);
+
+				CREATE TABLE IF NOT EXISTS lambda_function_layer (
+					id					integer primary key autoincrement,
+					function_id 		integer not null,
+					layer_id			integer not null,
+					FOREIGN KEY(function_id) REFERENCES lambda_function(id),
+					FOREIGN KEY(layer_id) REFERENCES lambda_layer(id)
+				);
+		`,
+	},
 }

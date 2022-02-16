@@ -4,6 +4,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	aws "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/smithy-go/middleware"
+	"myaws/utils"
+	"path/filepath"
 )
 
 type Function struct {
@@ -59,7 +61,28 @@ type Function struct {
 	StateReasonCode aws.StateReasonCode
 
 	// The version of the Lambda function.
-	Version *string
+	Version string
+}
+
+func CreateFunction(input *lambda.CreateFunctionInput) *Function {
+	var deadLetterArn string
+	if input.DeadLetterConfig != nil {
+		deadLetterArn = *input.DeadLetterConfig.TargetArn
+	}
+
+	return &Function{
+		FunctionName:  *input.FunctionName,
+		Role:          *input.Role,
+		Description:   utils.StringOrEmpty(input.Description),
+		Handler:       *input.Handler,
+		DeadLetterArn: deadLetterArn,
+		Layers:        nil, // TODO : body.Layers,
+		MemorySize:    utils.Int32OrDefault(input.MemorySize, 128),
+		Runtime:       input.Runtime,
+		Timeout:       utils.Int32OrDefault(input.Timeout, 3),
+		Environment:   EnvironmentOrEmpty(input.Environment),
+		Tags:          input.Tags,
+	}
 }
 
 func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
@@ -97,7 +120,7 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 		StateReasonCode:            "",
 		Timeout:                    &f.Timeout,
 		TracingConfig:              nil,
-		Version:                    f.Version,
+		Version:                    &f.Version,
 		VpcConfig:                  nil,
 		ResultMetadata:             middleware.Metadata{},
 	}
@@ -113,4 +136,9 @@ func layersToAws(layers []LambdaLayer) []aws.Layer {
 	}
 
 	return results
+}
+
+func (f *Function) GetDestPath() string {
+	return filepath.Join(settings.GetDataPath(), "lambda", "functions", f.FunctionName,
+		f.Version, "content")
 }

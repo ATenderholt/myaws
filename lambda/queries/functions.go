@@ -49,7 +49,7 @@ func InsertFunction(ctx context.Context, db *database.Database, function *types.
 	functionId, err := tx.InsertOne(
 		ctx,
 		`INSERT INTO lambda_function (name, version, description, handler, role, dead_letter_arn,
-					memory_size, runtime, timeout, code_sha256, code_size, lsat_modified_on)
+					memory_size, runtime, timeout, code_sha256, code_size, last_modified_on)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
 		function.FunctionName,

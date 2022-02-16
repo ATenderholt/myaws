@@ -27,17 +27,10 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	content := body.Code
+	// move Code to new variable so that most of response body can be printed
+	code := body.Code
 	body.Code = nil
 	log.Info("Creating lambda function %+v", body)
-
-	err = utils.DecompressZipFile(content.ZipFile, "")
-	if err != nil {
-		msg := fmt.Sprintf("error when saving function %s: %v", body.FunctionName, err)
-		log.Error(msg)
-		http.Error(response, msg, http.StatusInternalServerError)
-		return
-	}
 
 	ctx := request.Context()
 	db := database.CreateConnection()
@@ -63,29 +56,18 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	version := strconv.Itoa(dbVersion + 1)
+	function := types.CreateFunction(&body)
+	function.Version = strconv.Itoa(dbVersion + 1)
 
-	var deadLetterArn string
-	if body.DeadLetterConfig != nil {
-		deadLetterArn = *body.DeadLetterConfig.TargetArn
+	err = utils.DecompressZipFile(code.ZipFile, function.GetDestPath())
+	if err != nil {
+		msg := fmt.Sprintf("error when saving function %s: %v", *body.FunctionName, err)
+		log.Error(msg)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
 	}
 
-	function := types.Function{
-		FunctionName:  *body.FunctionName,
-		Description:   *body.Description,
-		Handler:       *body.Handler,
-		Role:          *body.Role,
-		DeadLetterArn: deadLetterArn,
-		Layers:        nil, // TODO : body.Layers,
-		MemorySize:    *body.MemorySize,
-		Runtime:       body.Runtime,
-		Timeout:       *body.Timeout,
-		Version:       &version,
-		Environment:   body.Environment,
-		Tags:          body.Tags,
-	}
-
-	saved, err := queries.InsertFunction(ctx, db, &function)
+	saved, err := queries.InsertFunction(ctx, db, function)
 	result := saved.ToCreateFunctionOutput()
 
 	utils.RespondWithJson(response, result)

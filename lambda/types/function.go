@@ -6,6 +6,7 @@ import (
 	"github.com/aws/smithy-go/middleware"
 	"myaws/utils"
 	"path/filepath"
+	"time"
 )
 
 type Function struct {
@@ -30,7 +31,7 @@ type Function struct {
 
 	// The date and time that the function was last updated, in ISO-8601 format
 	// (https://www.w3.org/TR/NOTE-datetime) (YYYY-MM-DDThh:mm:ss.sTZD).
-	LastModified string
+	LastModified int64
 
 	// The status of the last update that was performed on the function. This is first
 	// set to Successful after function creation completes.
@@ -82,10 +83,13 @@ func CreateFunction(input *lambda.CreateFunctionInput) *Function {
 		Timeout:       utils.Int32OrDefault(input.Timeout, 3),
 		Environment:   EnvironmentOrEmpty(input.Environment),
 		Tags:          input.Tags,
+		LastModified:  time.Now().UnixMilli(),
 	}
 }
 
 func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
+	lastModified := time.UnixMilli(f.LastModified).Format(timeFormat)
+
 	return &lambda.CreateFunctionOutput{
 		Architectures:    nil,
 		CodeSha256:       &f.CodeSha256,
@@ -102,7 +106,7 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 		Handler:                    &f.Handler,
 		ImageConfigResponse:        nil,
 		KMSKeyArn:                  nil,
-		LastModified:               &f.LastModified,
+		LastModified:               &lastModified,
 		LastUpdateStatus:           "",
 		LastUpdateStatusReason:     nil,
 		LastUpdateStatusReasonCode: "",
@@ -126,6 +130,56 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 	}
 }
 
+func (f *Function) ToGetFunctionOutput() *lambda.GetFunctionOutput {
+	deadLetter := aws.DeadLetterConfig{TargetArn: &f.DeadLetterArn}
+	lastModified := timeMillisToString(f.LastModified)
+
+	config := aws.FunctionConfiguration{
+		Architectures:              nil,
+		CodeSha256:                 &f.CodeSha256,
+		CodeSize:                   f.CodeSize,
+		DeadLetterConfig:           &deadLetter,
+		Description:                &f.Description,
+		Environment:                nil,
+		FileSystemConfigs:          nil,
+		FunctionArn:                f.GetArn(),
+		FunctionName:               &f.FunctionName,
+		Handler:                    &f.Handler,
+		ImageConfigResponse:        nil,
+		KMSKeyArn:                  nil,
+		LastModified:               &lastModified,
+		LastUpdateStatus:           "",
+		LastUpdateStatusReason:     nil,
+		LastUpdateStatusReasonCode: "",
+		Layers:                     nil,
+		MasterArn:                  nil,
+		MemorySize:                 &f.MemorySize,
+		PackageType:                "Zip",
+		RevisionId:                 nil,
+		Role:                       &f.Role,
+		Runtime:                    f.Runtime,
+		SigningJobArn:              nil,
+		SigningProfileVersionArn:   nil,
+		State:                      "Active",
+		StateReason:                nil,
+		StateReasonCode:            "",
+		Timeout:                    &f.Timeout,
+		TracingConfig:              nil,
+		Version:                    &f.Version,
+		VpcConfig:                  nil,
+	}
+
+	code := aws.FunctionCodeLocation{}
+	concurrency := aws.Concurrency{}
+	return &lambda.GetFunctionOutput{
+		Code:           &code,
+		Concurrency:    &concurrency,
+		Configuration:  &config,
+		Tags:           nil,
+		ResultMetadata: middleware.Metadata{},
+	}
+}
+
 func layersToAws(layers []LambdaLayer) []aws.Layer {
 	results := make([]aws.Layer, len(layers))
 	for i, layer := range layers {
@@ -141,4 +195,9 @@ func layersToAws(layers []LambdaLayer) []aws.Layer {
 func (f *Function) GetDestPath() string {
 	return filepath.Join(settings.GetDataPath(), "lambda", "functions", f.FunctionName,
 		f.Version, "content")
+}
+
+func (f *Function) GetArn() *string {
+	result := "arn:aws:lambda:" + settings.GetArnFragment() + ":function:" + f.FunctionName
+	return &result
 }

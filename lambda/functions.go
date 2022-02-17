@@ -11,6 +11,7 @@ import (
 	"myaws/utils"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 const PostLambdaFunctionRegex = `^/2015-03-31/functions$`
@@ -69,6 +70,34 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 
 	saved, err := queries.InsertFunction(ctx, db, function)
 	result := saved.ToCreateFunctionOutput()
+
+	utils.RespondWithJson(response, result)
+}
+
+func getFunctionName(path string) string {
+	parts := strings.Split(path, "/")
+	return parts[3]
+}
+
+const GetLambdaFunctionRegex = `^/2015-03-31/functions/[A-Za-z0-9_-]+$`
+
+func GetLambdaFunction(response http.ResponseWriter, request *http.Request) {
+	name := getFunctionName(request.URL.Path)
+
+	log.Info("Getting Lambda Function %s", name)
+
+	ctx := request.Context()
+	db := database.CreateConnection()
+	defer db.Close()
+
+	function, err := queries.FunctionByName(ctx, db, name)
+	if err != nil {
+		msg := log.Error("Unable to get Lambda Function %s: %v", name, err)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
+	}
+
+	result := function.ToGetFunctionOutput()
 
 	utils.RespondWithJson(response, result)
 }

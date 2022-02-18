@@ -23,7 +23,7 @@ type LambdaLayer struct {
 
 func (layer LambdaLayer) GetDestPath() string {
 	return filepath.Join(settings.GetDataPath(), "lambda", "layers", layer.Name,
-		strconv.Itoa(layer.Version), "content")
+		strconv.Itoa(layer.Version)+".zip")
 }
 
 func (layer LambdaLayer) GetArn() *string {

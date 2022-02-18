@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	aws "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"io/ioutil"
 	"myaws/database"
 	"myaws/lambda/queries"
 	"myaws/lambda/types"
 	"myaws/log"
 	"myaws/utils"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -139,7 +141,7 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 	}
 
 	log.Info("Found latest verion for layer %s: %v", layerName, version)
-	log.Info("Decompressing %d bytes from zipfile", len(body.Content.ZipFile))
+	log.Info("Saving %d bytes from zipfile", len(body.Content.ZipFile))
 
 	rawHash := sha256.Sum256(body.Content.ZipFile)
 	hash := base64.StdEncoding.EncodeToString(rawHash[:])
@@ -155,11 +157,16 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 
 	destPath := layer.GetDestPath()
 	log.Info("Saving layer %s to %s...", layerName, destPath)
-
-	err = utils.DecompressZipFile(body.Content.ZipFile, destPath)
+	err = utils.CreateDirs(filepath.Dir(destPath))
 	if err != nil {
-		msg := fmt.Sprintf("error when saving layer %s: %v", layerName, err)
-		log.Error(msg)
+		msg := log.Error("Unable to create parent directory for layer %s: %v", destPath, err)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
+	}
+
+	err = ioutil.WriteFile(destPath, body.Content.ZipFile, 0644)
+	if err != nil {
+		msg := log.Error("error when saving layer %s: %v", layerName, err)
 		http.Error(response, msg, http.StatusInternalServerError)
 		return
 	}

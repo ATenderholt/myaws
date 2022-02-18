@@ -2,6 +2,7 @@ package utils
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"io"
 	"myaws/log"
@@ -33,14 +34,6 @@ func (source ZipContent) ReadAt(p []byte, off int64) (n int, err error) {
 	}
 
 	return count, nil
-}
-
-func createDirs(dirPath string) {
-	log.Debug("Creating directory if necessary %s ...", dirPath)
-	err := os.MkdirAll(dirPath, 0755)
-	if err != nil {
-		panic(ZipFileError{"unable to create directory", dirPath, err})
-	}
 }
 
 func saveFile(filePath string, file zip.File) {
@@ -82,11 +75,17 @@ func DecompressZipFile(bytes []byte, destPath string) (returnError error) {
 	for _, f := range reader.File {
 		filePath := filepath.Join(destPath, f.Name)
 
+		var err error
 		if f.FileInfo().IsDir() {
-			createDirs(filePath)
+			err = CreateDirs(filePath)
 			continue
 		} else {
-			createDirs(filepath.Dir(filePath))
+			err = CreateDirs(filepath.Dir(filePath))
+		}
+
+		if err != nil {
+			msg := log.Error("Unable to create zip file %s: %v", destPath, err)
+			return errors.New(msg)
 		}
 
 		log.Info("Saving %s ...", filePath)

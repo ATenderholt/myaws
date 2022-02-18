@@ -6,6 +6,7 @@ import (
 	"myaws/config"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 var settings = config.GetSettings()
@@ -35,6 +36,20 @@ func (layer LambdaLayer) GetVersionArn() *string {
 	arn := layer.GetArn()
 	result := *arn + ":" + strconv.Itoa(layer.Version)
 	return &result
+}
+
+func LayerFromArn(arn string) LambdaLayer {
+	parts := strings.Split(arn, ":")
+	version, err := strconv.Atoi(parts[7])
+
+	if err != nil {
+		panic(err)
+	}
+
+	return LambdaLayer{
+		Name:    parts[6],
+		Version: version,
+	}
 }
 
 func (layer LambdaLayer) ToPublishLayerVersionOutput() *lambda.PublishLayerVersionOutput {

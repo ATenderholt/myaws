@@ -3,7 +3,6 @@ package utils
 import (
 	"archive/zip"
 	"errors"
-	"fmt"
 	"io"
 	"myaws/log"
 	"os"
@@ -36,42 +35,53 @@ func (source ZipContent) ReadAt(p []byte, off int64) (n int, err error) {
 	return count, nil
 }
 
-func saveFile(filePath string, file zip.File) {
+func saveFile(filePath string, file zip.File) error {
 	destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 	if err != nil {
-		panic(ZipFileError{"unable to create file", filePath, err})
+		msg := log.Error("unable to open file %s: %v", filePath, err)
+		return errors.New(msg)
 	}
 	defer destFile.Close()
 
 	fileInArchive, err := file.Open()
 	if err != nil {
-		panic(ZipFileError{"unable to open decompressed file", file.Name, err})
+		msg := log.Error("unable to decompress file %s: %v", file.Name, err)
+		return errors.New(msg)
 	}
 	defer fileInArchive.Close()
 
 	_, err = io.Copy(destFile, fileInArchive)
 	if err != nil {
-		panic(ZipFileError{"problem decompressing file", filePath, err})
+		msg := log.Error("problem decompressing file %s: %v", file.Name, err)
+		return errors.New(msg)
 	}
+
+	return nil
 }
 
-func DecompressZipFile(bytes []byte, destPath string) (returnError error) {
+func UncompressZipFile(file string, destPath string) error {
+	reader, err := zip.OpenReader(file)
+	if err != nil {
+		msg := log.Error("unable to uncompress zip from file %s: %v", file, err)
+		return errors.New(msg)
+	}
+	defer reader.Close()
+
+	return decompressZipFile(&reader.Reader, destPath)
+}
+
+func UncompressZipFileBytes(bytes []byte, destPath string) error {
 	content := ZipContent{Content: bytes, Length: int64(len(bytes))}
 	reader, err := zip.NewReader(content, content.Length)
-
 	if err != nil {
-		return fmt.Errorf("error when reading zip: %v", err)
+		msg := log.Error("Unable to uncompress zip from bytes: %v", err)
+		return errors.New(msg)
 	}
 
-	defer func() {
-		if e := recover(); e != nil {
-			// cleanup?
-			err := e.(ZipFileError)
-			log.Error(err.Error())
-			returnError = err
-		}
-	}()
+	return decompressZipFile(reader, destPath)
+}
 
+func decompressZipFile(reader *zip.Reader, destPath string) error {
 	for _, f := range reader.File {
 		filePath := filepath.Join(destPath, f.Name)
 
@@ -84,12 +94,16 @@ func DecompressZipFile(bytes []byte, destPath string) (returnError error) {
 		}
 
 		if err != nil {
-			msg := log.Error("Unable to create zip file %s: %v", destPath, err)
+			msg := log.Error("unable to create directory for file %s in %s: %v", f.Name, destPath, err)
 			return errors.New(msg)
 		}
 
 		log.Info("Saving %s ...", filePath)
-		saveFile(filePath, *f)
+		err = saveFile(filePath, *f)
+		if err != nil {
+			msg := log.Error("unable to save file %s in %s: %v", f.Name, destPath, err)
+			return errors.New(msg)
+		}
 
 	}
 

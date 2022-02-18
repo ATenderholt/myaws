@@ -62,12 +62,25 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 	function := types.CreateFunction(&body)
 	function.Version = strconv.Itoa(dbVersion + 1)
 
-	err = utils.DecompressZipFile(code.ZipFile, function.GetDestPath())
+	// TODO : validate Layer runtime support
+
+	err = utils.UncompressZipFileBytes(code.ZipFile, function.GetDestPath())
 	if err != nil {
 		msg := fmt.Sprintf("error when saving function %s: %v", *body.FunctionName, err)
 		log.Error(msg)
 		http.Error(response, msg, http.StatusInternalServerError)
 		return
+	}
+
+	layerDestPath := function.GetLayerDestPath()
+	for _, layer := range function.Layers {
+		layerPath := layer.GetDestPath()
+		err = utils.UncompressZipFile(layerPath, layerDestPath)
+		if err != nil {
+			msg := log.Error("error when unpacking layer %s: %v", layer.Name, err)
+			http.Error(response, msg, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	saved, err := queries.InsertFunction(ctx, db, function)

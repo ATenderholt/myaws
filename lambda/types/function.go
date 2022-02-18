@@ -71,13 +71,18 @@ func CreateFunction(input *lambda.CreateFunctionInput) *Function {
 		deadLetterArn = *input.DeadLetterConfig.TargetArn
 	}
 
+	layers := make([]LambdaLayer, len(input.Layers))
+	for i, layer := range input.Layers {
+		layers[i] = LayerFromArn(layer)
+	}
+
 	return &Function{
 		FunctionName:  *input.FunctionName,
 		Role:          *input.Role,
 		Description:   utils.StringOrEmpty(input.Description),
 		Handler:       *input.Handler,
 		DeadLetterArn: deadLetterArn,
-		Layers:        nil, // TODO : body.Layers,
+		Layers:        layers,
 		MemorySize:    utils.Int32OrDefault(input.MemorySize, 128),
 		Runtime:       input.Runtime,
 		Timeout:       utils.Int32OrDefault(input.Timeout, 3),
@@ -198,6 +203,11 @@ func layersToAws(layers []LambdaLayer) []aws.Layer {
 func (f *Function) GetDestPath() string {
 	return filepath.Join(settings.GetDataPath(), "lambda", "functions", f.FunctionName,
 		f.Version, "content")
+}
+
+func (f *Function) GetLayerDestPath() string {
+	return filepath.Join(settings.GetDataPath(), "lambda", "functions", f.FunctionName,
+		f.Version, "layers")
 }
 
 func (f *Function) GetArn() *string {

@@ -137,7 +137,7 @@ func InsertFunction(ctx context.Context, db *database.Database, function *types.
 	return &saved, nil
 }
 
-func FunctionByName(ctx context.Context, db *database.Database, name string) (*types.Function, error) {
+func LatestFunctionByName(ctx context.Context, db *database.Database, name string) (*types.Function, error) {
 	var function types.Function
 	err := db.QueryRowContext(
 		ctx,
@@ -176,4 +176,51 @@ func FunctionByName(ctx context.Context, db *database.Database, name string) (*t
 	function.Version = "$LATEST"
 
 	return &function, nil
+}
+
+func FunctionVersionsByName(ctx context.Context, db *database.Database, name string) ([]types.Function, error) {
+	log.Info("Querying for all Versions of Function %s", name)
+
+	var results []types.Function
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT id, name, version, description, handler, role, dead_letter_arn, memory_size,
+					runtime, timeout, code_sha256, code_size, last_modified_on
+				FROM lambda_function WHERE name = ?`,
+		name,
+	)
+
+	if err != nil {
+		msg := log.Error("Error when querying for all versions of Function %s: %v", name, err)
+		return nil, errors.New(msg)
+	}
+
+	for rows.Next() {
+		var function types.Function
+		err := rows.Scan(
+			&function.ID,
+			&function.FunctionName,
+			&function.Version,
+			&function.Description,
+			&function.Handler,
+			&function.Role,
+			&function.DeadLetterArn,
+			&function.MemorySize,
+			&function.Runtime,
+			&function.Timeout,
+			&function.CodeSha256,
+			&function.CodeSize,
+			&function.LastModified,
+		)
+
+		if err != nil {
+			progress := len(results)
+			msg := log.Error("Error when scanning row %d for Function %s: %v", progress, name, err)
+			return nil, errors.New(msg)
+		}
+
+		results = append(results, function)
+	}
+
+	return results, nil
 }

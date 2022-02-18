@@ -130,11 +130,11 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 	}
 }
 
-func (f *Function) ToGetFunctionOutput() *lambda.GetFunctionOutput {
+func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 	deadLetter := aws.DeadLetterConfig{TargetArn: &f.DeadLetterArn}
 	lastModified := timeMillisToString(f.LastModified)
 
-	config := aws.FunctionConfiguration{
+	return &aws.FunctionConfiguration{
 		Architectures:              nil,
 		CodeSha256:                 &f.CodeSha256,
 		CodeSize:                   f.CodeSize,
@@ -168,13 +168,16 @@ func (f *Function) ToGetFunctionOutput() *lambda.GetFunctionOutput {
 		Version:                    &f.Version,
 		VpcConfig:                  nil,
 	}
+}
 
+func (f *Function) ToGetFunctionOutput() *lambda.GetFunctionOutput {
+	config := f.ToFunctionConfiguration()
 	code := aws.FunctionCodeLocation{}
 	concurrency := aws.Concurrency{}
 	return &lambda.GetFunctionOutput{
 		Code:           &code,
 		Concurrency:    &concurrency,
-		Configuration:  &config,
+		Configuration:  config,
 		Tags:           nil,
 		ResultMetadata: middleware.Metadata{},
 	}

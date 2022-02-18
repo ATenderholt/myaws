@@ -140,10 +140,6 @@ func GetFunctionVersions(response http.ResponseWriter, request *http.Request) {
 const GetFunctionCodeSigningRegex = `/2020-06-30/functions/[0-9A-Za-z_-]+/code-signing-config`
 
 func GetFunctionCodeSigning(response http.ResponseWriter, request *http.Request) {
-	err := utils.ProxyToAws(&response, request, "lambda", "us-west-2")
-	if err != nil {
-		log.Error("Problem proxying to AWS: %v", err)
-		http.Error(response, err.Error(), http.StatusBadGateway)
-		return
-	}
+	result := lambda.GetFunctionCodeSigningConfigOutput{}
+	utils.RespondWithJson(response, result)
 }

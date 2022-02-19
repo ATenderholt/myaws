@@ -26,7 +26,7 @@ func Debug(format string, v ...interface{}) {
 		return
 	}
 
-	_, file, line, ok := runtime.Caller(0)
+	_, file, line, ok := runtime.Caller(1)
 	var fileInfo string
 	if ok {
 		fileInfo = fmt.Sprintf("%s(%d) ", file, line)
@@ -38,7 +38,7 @@ func Debug(format string, v ...interface{}) {
 }
 
 func Error(format string, v ...interface{}) string {
-	_, file, line, ok := runtime.Caller(0)
+	_, file, line, ok := runtime.Caller(1)
 	var fileInfo string
 	if ok {
 		fileInfo = fmt.Sprintf("%s(%d) ", file, line)

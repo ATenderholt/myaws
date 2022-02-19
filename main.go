@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"github.com/docker/docker/api/types/mount"
 	"io"
 	"myaws/config"
@@ -9,8 +11,11 @@ import (
 	"myaws/lambda"
 	"myaws/log"
 	"net/http"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -84,26 +89,54 @@ func (h *RegexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//w.WriteHeader(resp.StatusCode)
 	//io.Copy(w, resp.Body)
 }
-
 func main() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		s := <-c
+		log.Info("Received signal %v", s)
+		cancel()
+	}()
+
+	if err := start(ctx); err != nil {
+		log.Error("Failed to start: %v", err)
+	}
+}
+
+func start(ctx context.Context) error {
+	log.Info("Starting up ...")
 	settings := config.GetSettings()
 	log.Info("Settings: %+v", *settings)
 
 	initializeDb()
 	initializeDocker()
+	srv, err := serveHTTP()
+	if err != nil {
+		return err
+	}
 
-	handler := RegexHandler{}
-	handler.HandleFunc(lambda.GetAllLayerVersionsRegex, http.MethodGet, lambda.GetAllLayerVersions)
-	handler.HandleFunc(lambda.GetLayerVersionsRegex, http.MethodGet, lambda.GetLayerVersion)
-	handler.HandleFunc(lambda.PostLayerVersionsRegex, http.MethodPost, lambda.PostLayerVersions)
-	handler.HandleFunc(lambda.GetLambdaFunctionRegex, http.MethodGet, lambda.GetLambdaFunction)
-	handler.HandleFunc(lambda.GetFunctionCodeSigningRegex, http.MethodGet, lambda.GetFunctionCodeSigning)
-	handler.HandleFunc(lambda.GetFunctionVersionsRegex, http.MethodGet, lambda.GetFunctionVersions)
-	handler.HandleFunc(lambda.PostLambdaFunctionRegex, http.MethodPost, lambda.PostLambdaFunction)
+	<-ctx.Done()
 
-	http.Handle("/", &handler)
+	log.Info("Shutting down ...")
 
-	log.Panic(http.ListenAndServe(":8080", nil).Error())
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer func() {
+		cancel()
+	}()
+
+	err = srv.Shutdown(ctxShutDown)
+	if err != nil {
+		log.Error("Error when shutting down HTTP server")
+	}
+
+	err = docker.ShutdownAll()
+	if err != nil {
+		log.Error("Errors when shutting down docker containers: %v", err)
+	}
+
+	return nil
 }
 
 func initializeDb() {
@@ -115,8 +148,7 @@ func initializeDb() {
 }
 
 func initializeDocker() {
-	client := docker.NewController()
-	client.EnsureImage(imageS3)
+	docker.EnsureImage(imageS3)
 
 	minio := docker.Container{
 		Name:  "s3",
@@ -134,8 +166,40 @@ func initializeDocker() {
 		},
 	}
 
-	err := client.Start(minio)
+	err := docker.Start(minio)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func serveHTTP() (srv *http.Server, err error) {
+	mux := http.NewServeMux()
+
+	handler := RegexHandler{}
+	handler.HandleFunc(lambda.GetAllLayerVersionsRegex, http.MethodGet, lambda.GetAllLayerVersions)
+	handler.HandleFunc(lambda.GetLayerVersionsRegex, http.MethodGet, lambda.GetLayerVersion)
+	handler.HandleFunc(lambda.PostLayerVersionsRegex, http.MethodPost, lambda.PostLayerVersions)
+	handler.HandleFunc(lambda.GetLambdaFunctionRegex, http.MethodGet, lambda.GetLambdaFunction)
+	handler.HandleFunc(lambda.GetFunctionCodeSigningRegex, http.MethodGet, lambda.GetFunctionCodeSigning)
+	handler.HandleFunc(lambda.GetFunctionVersionsRegex, http.MethodGet, lambda.GetFunctionVersions)
+	handler.HandleFunc(lambda.PostLambdaFunctionRegex, http.MethodPost, lambda.PostLambdaFunction)
+
+	mux.Handle("/", &handler)
+	port := 8080
+
+	srv = &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	go func() {
+		e := srv.ListenAndServe()
+		if e != nil && e != http.ErrServerClosed {
+			msg := log.Error("Problem starting HTTP server: %v", e)
+			err = errors.New(msg)
+		}
+	}()
+
+	log.Info("Finished starting HTTP server on port %d", port)
+	return
 }

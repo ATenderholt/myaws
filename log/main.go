@@ -5,6 +5,7 @@ import (
 	base "log"
 	"myaws/config"
 	"os"
+	"runtime"
 )
 
 var debug *base.Logger
@@ -21,13 +22,31 @@ func init() {
 }
 
 func Debug(format string, v ...interface{}) {
-	if config.GetSettings().IsDebug() {
-		debug.Printf(format, v...)
+	if !config.GetSettings().IsDebug() {
+		return
 	}
+
+	_, file, line, ok := runtime.Caller(0)
+	var fileInfo string
+	if ok {
+		fileInfo = fmt.Sprintf("%s(%d) ", file, line)
+	} else {
+		fileInfo = ""
+	}
+
+	debug.Printf(fileInfo+format, v...)
 }
 
 func Error(format string, v ...interface{}) string {
-	msg := fmt.Sprintf(format, v...)
+	_, file, line, ok := runtime.Caller(0)
+	var fileInfo string
+	if ok {
+		fileInfo = fmt.Sprintf("%s(%d) ", file, line)
+	} else {
+		fileInfo = ""
+	}
+
+	msg := fmt.Sprintf(fileInfo+format, v...)
 	err.Printf(msg)
 	return msg
 }

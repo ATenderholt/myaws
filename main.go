@@ -4,6 +4,7 @@ import (
 	"io"
 	"myaws/config"
 	"myaws/database"
+	"myaws/docker"
 	"myaws/lambda"
 	"myaws/log"
 	"net/http"
@@ -85,6 +86,7 @@ func main() {
 	log.Info("Settings: %+v", *settings)
 
 	initializeDb()
+	initializeDocker()
 
 	handler := RegexHandler{}
 	handler.HandleFunc(lambda.GetAllLayerVersionsRegex, http.MethodGet, lambda.GetAllLayerVersions)
@@ -106,4 +108,9 @@ func initializeDb() {
 
 	log.Info("Initializing DB with %d Migrations.", migrations.Size())
 	database.Initialize(migrations)
+}
+
+func initializeDocker() {
+	client := docker.NewController()
+	client.EnsureImage("bitnami/minio:2022.2.16")
 }

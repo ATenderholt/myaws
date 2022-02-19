@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/docker/docker/api/types/mount"
 	"io"
 	"myaws/config"
 	"myaws/database"
@@ -8,10 +9,13 @@ import (
 	"myaws/lambda"
 	"myaws/log"
 	"net/http"
+	"path/filepath"
 	"regexp"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+const imageS3 = "bitnami/minio:2022.2.16"
 
 type route struct {
 	pattern *regexp.Regexp
@@ -112,5 +116,22 @@ func initializeDb() {
 
 func initializeDocker() {
 	client := docker.NewController()
-	client.EnsureImage("bitnami/minio:2022.2.16")
+	client.EnsureImage(imageS3)
+
+	minio := docker.Container{
+		Name:  "s3",
+		Image: imageS3,
+		Mounts: []mount.Mount{
+			{
+				Source: filepath.Join(config.GetSettings().GetDataPath()),
+				Target: "/data",
+				Type:   mount.TypeBind,
+			},
+		},
+	}
+
+	err := client.Start(minio)
+	if err != nil {
+		panic(err)
+	}
 }

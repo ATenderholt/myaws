@@ -2,6 +2,8 @@ package config
 
 import (
 	"flag"
+	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -30,7 +32,16 @@ func GetSettings() *Settings {
 }
 
 func (settings *Settings) GetDataPath() string {
-	return settings.dataPath
+	if settings.dataPath[0] == '/' {
+		return settings.dataPath
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	return filepath.Join(cwd, settings.dataPath)
 }
 
 func (settings *Settings) GetArnFragment() string {

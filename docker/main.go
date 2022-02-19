@@ -3,14 +3,17 @@ package docker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"myaws/log"
 	"myaws/utils"
 )
 
 type Docker struct {
-	cli *client.Client
+	cli     *client.Client
+	running map[string]Container
 }
 
 func NewController() *Docker {
@@ -19,7 +22,8 @@ func NewController() *Docker {
 		panic(err)
 	}
 
-	return &Docker{cli}
+	running := make(map[string]Container, 5)
+	return &Docker{cli: cli, running: running}
 }
 
 func (d *Docker) EnsureImage(image string) {
@@ -41,4 +45,50 @@ func (d *Docker) EnsureImage(image string) {
 
 		log.Info("[DOCKER] %s", progress)
 	}
+}
+
+func (d *Docker) Start(c Container) error {
+	hostConfig := container.HostConfig{}
+	hostConfig.Mounts = c.Mounts
+
+	containerConfig := container.Config{
+		ExposedPorts: nil,
+		Tty:          false,
+		Cmd:          c.command,
+		Image:        c.Image,
+	}
+
+	ctx := context.Background()
+	resp, err := d.cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, c.Name)
+	if err != nil {
+		msg := log.Error("Unable to create container %s: %v", c, err)
+		return errors.New(msg)
+	}
+
+	err = d.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
+	if err != nil {
+		msg := log.Error("Unable to start container %s: %v", c, err)
+		return errors.New(msg)
+	}
+
+	c.ID = resp.ID
+	d.running[c.Name] = c
+
+	go func() {
+		logOptions := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true}
+		reader, err := d.cli.ContainerLogs(ctx, resp.ID, logOptions)
+
+		if err != nil {
+			log.Error("Unable to follow logs for container %s: %v", c, err)
+			return
+		}
+		defer reader.Close()
+
+		lines := utils.ReadLinesAsBytes(reader)
+		for line := range lines {
+			log.Info("[DOCKER] %s", line)
+		}
+	}()
+
+	return nil
 }

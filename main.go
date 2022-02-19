@@ -128,6 +128,10 @@ func initializeDocker() {
 				Type:   mount.TypeBind,
 			},
 		},
+		Ports: map[int]int{
+			9000: 9000,
+			9001: 9001,
+		},
 	}
 
 	err := client.Start(minio)

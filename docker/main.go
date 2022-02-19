@@ -48,13 +48,20 @@ func (d *Docker) EnsureImage(image string) {
 }
 
 func (d *Docker) Start(c Container) error {
+	portSet, portMap, err := c.PortBindings()
+	if err != nil {
+		msg := log.Error("Unable to get port bindings: %v", err)
+		return errors.New(msg)
+	}
+
 	hostConfig := container.HostConfig{}
 	hostConfig.Mounts = c.Mounts
+	hostConfig.PortBindings = portMap
 
 	containerConfig := container.Config{
-		ExposedPorts: nil,
+		ExposedPorts: portSet,
 		Tty:          false,
-		Cmd:          c.command,
+		Cmd:          c.Command,
 		Image:        c.Image,
 	}
 
@@ -75,7 +82,7 @@ func (d *Docker) Start(c Container) error {
 	d.running[c.Name] = c
 
 	go func() {
-		logOptions := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true}
+		logOptions := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true}
 		reader, err := d.cli.ContainerLogs(ctx, resp.ID, logOptions)
 
 		if err != nil {
@@ -86,8 +93,10 @@ func (d *Docker) Start(c Container) error {
 
 		lines := utils.ReadLinesAsBytes(reader)
 		for line := range lines {
-			log.Info("[DOCKER] %s", line)
+			log.Info("[DOCKER %s] %s", c.Name, string(line))
 		}
+
+		log.Info("[DOCKER] Logs finished for container %s", c)
 	}()
 
 	return nil

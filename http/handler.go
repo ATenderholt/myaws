@@ -17,14 +17,6 @@ type RegexHandler struct {
 	routes []*route
 }
 
-func (h *RegexHandler) Handler(pattern string, method string, handler http.Handler) {
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		panic(err)
-	}
-	h.routes = append(h.routes, &route{regex, method, handler})
-}
-
 func (h *RegexHandler) HandleFunc(pattern string, method string, handler func(http.ResponseWriter, *http.Request)) {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {

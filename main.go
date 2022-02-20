@@ -3,24 +3,21 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/docker/docker/api/types/mount"
 	"io"
 	"myaws/config"
 	"myaws/database"
 	"myaws/docker"
 	"myaws/lambda"
 	"myaws/log"
+	"myaws/s3"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"regexp"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
-
-const imageS3 = "bitnami/minio:2022.2.16"
 
 type route struct {
 	pattern *regexp.Regexp
@@ -148,25 +145,8 @@ func initializeDb() {
 }
 
 func initializeDocker() {
-	docker.EnsureImage(imageS3)
-
-	minio := docker.Container{
-		Name:  "s3",
-		Image: imageS3,
-		Mounts: []mount.Mount{
-			{
-				Source: filepath.Join(config.GetSettings().GetDataPath(), "s3"),
-				Target: "/data",
-				Type:   mount.TypeBind,
-			},
-		},
-		Ports: map[int]int{
-			9000: 9000,
-			9001: 9001,
-		},
-	}
-
-	err := docker.Start(minio)
+	docker.EnsureImage(s3.Image)
+	err := docker.Start(s3.Container)
 	if err != nil {
 		panic(err)
 	}
@@ -183,6 +163,9 @@ func serveHTTP() (srv *http.Server, err error) {
 	handler.HandleFunc(lambda.GetFunctionCodeSigningRegex, http.MethodGet, lambda.GetFunctionCodeSigning)
 	handler.HandleFunc(lambda.GetFunctionVersionsRegex, http.MethodGet, lambda.GetFunctionVersions)
 	handler.HandleFunc(lambda.PostLambdaFunctionRegex, http.MethodPost, lambda.PostLambdaFunction)
+	handler.HandleFunc("/", http.MethodHead, s3.ProxyToMinio)
+	handler.HandleFunc("/", http.MethodGet, s3.ProxyToMinio)
+	handler.HandleFunc("/", http.MethodPut, s3.ProxyToMinio)
 
 	mux.Handle("/", &handler)
 	port := 8080

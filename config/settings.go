@@ -7,11 +7,17 @@ import (
 	"sync"
 )
 
+type S3Settings struct {
+	Host string
+	Port int
+}
+
 type Settings struct {
 	accountNumber string
 	dataPath      string
 	debug         bool
 	region        string
+	s3            S3Settings
 }
 
 var once sync.Once
@@ -22,6 +28,8 @@ func GetSettings() *Settings {
 		instance = Settings{}
 		flag.StringVar(&instance.dataPath, "data-path", "data", "Path to data directory")
 		flag.BoolVar(&instance.debug, "debug", false, "Enable trace debugging")
+		flag.StringVar(&instance.s3.Host, "s3-host", "localhost", "Host for S3 / minio")
+		flag.IntVar(&instance.s3.Port, "s3-port", 9000, "Base port for S3 / minio")
 		flag.Parse()
 
 		instance.accountNumber = "000000000000"
@@ -50,4 +58,8 @@ func (settings *Settings) GetArnFragment() string {
 
 func (settings *Settings) IsDebug() bool {
 	return settings.debug
+}
+
+func (settings *Settings) S3() S3Settings {
+	return settings.s3
 }

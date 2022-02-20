@@ -155,7 +155,7 @@ func initializeDocker() {
 		Image: imageS3,
 		Mounts: []mount.Mount{
 			{
-				Source: filepath.Join(config.GetSettings().GetDataPath()),
+				Source: filepath.Join(config.GetSettings().GetDataPath(), "s3"),
 				Target: "/data",
 				Type:   mount.TypeBind,
 			},

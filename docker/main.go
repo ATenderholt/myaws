@@ -63,7 +63,7 @@ func Start(c Container) error {
 	}
 
 	hostConfig := container.HostConfig{}
-	hostConfig.Mounts = c.GetMounts()
+	hostConfig.Mounts = c.Mounts
 	hostConfig.PortBindings = portMap
 
 	containerConfig := container.Config{

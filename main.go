@@ -9,6 +9,7 @@ import (
 	"myaws/lambda"
 	"myaws/log"
 	"myaws/s3"
+	"myaws/sqs"
 	"os"
 	"os/signal"
 	"time"
@@ -77,6 +78,12 @@ func initializeDb() {
 func initializeDocker() {
 	docker.EnsureImage(s3.Image)
 	err := docker.Start(s3.Container)
+	if err != nil {
+		panic(err)
+	}
+
+	docker.EnsureImage(sqs.Image)
+	err = docker.Start(sqs.Container)
 	if err != nil {
 		panic(err)
 	}

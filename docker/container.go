@@ -1,12 +1,9 @@
 package docker
 
 import (
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
-	"myaws/log"
-	"os"
 )
 
 type Container struct {
@@ -33,32 +30,4 @@ func (c Container) PortBindings() (map[nat.Port]struct{}, map[nat.Port][]nat.Por
 	}
 
 	return nat.ParsePortSpecs(specs)
-}
-
-func (c Container) GetMounts() []mount.Mount {
-	for _, mnt := range c.Mounts {
-		dest := mnt.Source
-		stats, err := os.Stat(dest)
-
-		if err == nil && stats.IsDir() {
-			continue
-		}
-
-		if err == nil && !stats.IsDir() {
-			msg := log.Error("%s already exists, but is not a directory", dest)
-			panic(msg)
-		}
-
-		if errors.Is(err, os.ErrNotExist) {
-			log.Info("Creating directory %s ...", dest)
-			err2 := os.MkdirAll(dest, 0755)
-			if err2 != nil {
-				msg := log.Error("Unable to create %s: %v", dest, err2)
-				panic(msg)
-			}
-			log.Info(".... %s created.", dest)
-		}
-	}
-
-	return c.Mounts
 }

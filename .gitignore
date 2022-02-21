@@ -2,3 +2,7 @@ data
 myaws
 *.zip
 .idea
+.terraform/
+dependencies/
+terraform.tfstate.d/
+

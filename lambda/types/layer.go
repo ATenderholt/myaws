@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-var settings = config.GetSettings()
-
 type LambdaLayer struct {
 	ID                 int64
 	Name               string
@@ -23,12 +21,12 @@ type LambdaLayer struct {
 }
 
 func (layer LambdaLayer) GetDestPath() string {
-	return filepath.Join(settings.GetDataPath(), "lambda", "layers", layer.Name,
+	return filepath.Join(config.GetDataPath(), "lambda", "layers", layer.Name,
 		strconv.Itoa(layer.Version)+".zip")
 }
 
 func (layer LambdaLayer) GetArn() *string {
-	result := "arn:aws:lambda:" + settings.GetArnFragment() + ":layer:" + layer.Name
+	result := "arn:aws:lambda:" + config.GetArnFragment() + ":layer:" + layer.Name
 	return &result
 }
 

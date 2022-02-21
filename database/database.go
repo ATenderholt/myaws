@@ -14,8 +14,7 @@ type Database struct {
 }
 
 func CreateConnection() *Database {
-	settings := config.GetSettings()
-	dbPath := filepath.Join(settings.GetDataPath(), "db.sqlite3")
+	dbPath := filepath.Join(config.GetDataPath(), "db.sqlite3")
 	connStr := fmt.Sprintf("file:%s", dbPath)
 
 	db, err := sql.Open("sqlite3", connStr)

@@ -13,7 +13,7 @@ var err *base.Logger
 var info *base.Logger
 
 func init() {
-	if config.GetSettings().IsDebug() {
+	if config.IsDebug() {
 		debug = base.New(os.Stdout, "[DEBUG] ", base.LstdFlags)
 	}
 
@@ -22,7 +22,7 @@ func init() {
 }
 
 func Debug(format string, v ...interface{}) {
-	if !config.GetSettings().IsDebug() {
+	if !config.IsDebug() {
 		return
 	}
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"myaws/config"
 	"myaws/database"
 	"myaws/docker"
 	"myaws/http"
@@ -35,8 +34,6 @@ func main() {
 
 func start(ctx context.Context) error {
 	log.Info("Starting up ...")
-	settings := config.GetSettings()
-	log.Info("Settings: %+v", *settings)
 
 	initializeDb()
 	initializeDocker()

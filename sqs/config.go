@@ -13,8 +13,8 @@ import (
 
 const Image = "softwaremill/elasticmq:1.3.4"
 
-var basePath = filepath.Join(config.GetSettings().GetDataPath(), "sqs")
-var configPath = filepath.Join(config.GetSettings().GetDataPath(), "sqs.conf")
+var basePath = filepath.Join(config.GetDataPath(), "sqs")
+var configPath = filepath.Join(config.GetDataPath(), "sqs.conf")
 
 var Container = docker.Container{
 	Name:  "sqs",
@@ -77,8 +77,7 @@ func writeConfigFile() {
 		panic(msg)
 	}
 
-	settings := config.GetSettings()
-	contents := fmt.Sprintf(configFileTemplate, settings.Region(), settings.AccountNumber())
+	contents := fmt.Sprintf(configFileTemplate, config.Region(), config.AccountNumber())
 	_, err = f.WriteString(contents)
 	if err != nil {
 		msg := log.Error("Unable to write contents to %s: %v", configPath, err)

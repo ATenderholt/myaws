@@ -14,7 +14,7 @@ var Container = docker.Container{
 	Image: Image,
 	Mounts: []mount.Mount{
 		{
-			Source: filepath.Join(config.GetSettings().GetDataPath(), "s3"),
+			Source: filepath.Join(config.GetDataPath(), "s3"),
 			Target: "/data",
 			Type:   mount.TypeBind,
 		},

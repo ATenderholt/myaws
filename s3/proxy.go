@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-var settings = config.GetSettings()
-
 func ProxyToMinio(response http.ResponseWriter, request *http.Request) {
 	err := proxyToMinio(&response, request, "us-west-2")
 	if err != nil {
@@ -23,7 +21,7 @@ func ProxyToMinio(response http.ResponseWriter, request *http.Request) {
 }
 
 func proxyToMinio(response *http.ResponseWriter, request *http.Request, region string) error {
-	url := fmt.Sprintf("http://%s:%d%s", settings.S3().Host, settings.S3().Port, request.URL.Path)
+	url := fmt.Sprintf("http://%s:%d%s", config.S3().Host, config.S3().Port, request.URL.Path)
 	body, _ := io.ReadAll(request.Body)
 	proxyReq, _ := http.NewRequest(request.Method, url, bytes.NewReader(body))
 

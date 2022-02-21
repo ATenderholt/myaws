@@ -4,6 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	aws "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/smithy-go/middleware"
+	"myaws/config"
 	"myaws/utils"
 	"path/filepath"
 	"time"
@@ -201,16 +202,16 @@ func layersToAws(layers []LambdaLayer) []aws.Layer {
 }
 
 func (f *Function) GetDestPath() string {
-	return filepath.Join(settings.GetDataPath(), "lambda", "functions", f.FunctionName,
+	return filepath.Join(config.GetDataPath(), "lambda", "functions", f.FunctionName,
 		f.Version, "content")
 }
 
 func (f *Function) GetLayerDestPath() string {
-	return filepath.Join(settings.GetDataPath(), "lambda", "functions", f.FunctionName,
+	return filepath.Join(config.GetDataPath(), "lambda", "functions", f.FunctionName,
 		f.Version, "layers")
 }
 
 func (f *Function) GetArn() *string {
-	result := "arn:aws:lambda:" + settings.GetArnFragment() + ":function:" + f.FunctionName
+	result := "arn:aws:lambda:" + config.GetArnFragment() + ":function:" + f.FunctionName
 	return &result
 }

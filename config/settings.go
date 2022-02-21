@@ -4,7 +4,6 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
-	"sync"
 )
 
 type S3Settings struct {
@@ -20,32 +19,27 @@ type Settings struct {
 	s3            S3Settings
 }
 
-var once sync.Once
 var instance Settings
 
-func GetSettings() *Settings {
-	once.Do(func() {
-		instance = Settings{}
-		flag.StringVar(&instance.accountNumber, "account-number", "271828182845", "Account number")
-		flag.StringVar(&instance.dataPath, "data-path", "data", "Path to data directory")
-		flag.BoolVar(&instance.debug, "debug", false, "Enable trace debugging")
-		flag.StringVar(&instance.s3.Host, "s3-host", "localhost", "Host for S3 / minio")
-		flag.IntVar(&instance.s3.Port, "s3-port", 9000, "Base port for S3 / minio")
-		flag.Parse()
+func init() {
+	instance = Settings{}
+	flag.StringVar(&instance.accountNumber, "account-number", "271828182845", "Account number")
+	flag.StringVar(&instance.dataPath, "data-path", "data", "Path to data directory")
+	flag.BoolVar(&instance.debug, "debug", false, "Enable trace debugging")
+	flag.StringVar(&instance.s3.Host, "s3-host", "localhost", "Host for S3 / minio")
+	flag.IntVar(&instance.s3.Port, "s3-port", 9000, "Base port for S3 / minio")
+	flag.Parse()
 
-		instance.region = "us-west-2"
-	})
-
-	return &instance
+	instance.region = "us-west-2"
 }
 
-func (settings *Settings) AccountNumber() string {
-	return settings.accountNumber
+func AccountNumber() string {
+	return instance.accountNumber
 }
 
-func (settings *Settings) GetDataPath() string {
-	if settings.dataPath[0] == '/' {
-		return settings.dataPath
+func GetDataPath() string {
+	if instance.dataPath[0] == '/' {
+		return instance.dataPath
 	}
 
 	cwd, err := os.Getwd()
@@ -53,21 +47,21 @@ func (settings *Settings) GetDataPath() string {
 		panic(err)
 	}
 
-	return filepath.Join(cwd, settings.dataPath)
+	return filepath.Join(cwd, instance.dataPath)
 }
 
-func (settings *Settings) GetArnFragment() string {
-	return settings.region + ":" + settings.accountNumber
+func GetArnFragment() string {
+	return instance.region + ":" + instance.accountNumber
 }
 
-func (settings *Settings) IsDebug() bool {
-	return settings.debug
+func IsDebug() bool {
+	return instance.debug
 }
 
-func (settings *Settings) Region() string {
-	return settings.region
+func Region() string {
+	return instance.region
 }
 
-func (settings *Settings) S3() S3Settings {
-	return settings.s3
+func S3() S3Settings {
+	return instance.s3
 }

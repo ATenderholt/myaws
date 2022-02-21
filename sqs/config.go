@@ -32,8 +32,8 @@ var Container = docker.Container{
 		},
 	},
 	Ports: map[int]int{
-		9324: 9324,
-		9325: 9325,
+		9324: config.SQS().Port,
+		9325: config.SQS().Port + 1,
 	},
 }
 

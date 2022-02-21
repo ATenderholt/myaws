@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-type S3Settings struct {
+type HostSettings struct {
 	Host string
 	Port int
 }
@@ -16,7 +16,8 @@ type Settings struct {
 	dataPath      string
 	debug         bool
 	region        string
-	s3            S3Settings
+	s3            HostSettings
+	sqs           HostSettings
 }
 
 var instance Settings
@@ -28,6 +29,8 @@ func init() {
 	flag.BoolVar(&instance.debug, "debug", false, "Enable trace debugging")
 	flag.StringVar(&instance.s3.Host, "s3-host", "localhost", "Host for S3 / minio")
 	flag.IntVar(&instance.s3.Port, "s3-port", 9000, "Base port for S3 / minio")
+	flag.StringVar(&instance.sqs.Host, "sqs-host", "localhost", "Host for SQS / ElasticMQ")
+	flag.IntVar(&instance.sqs.Port, "sqs-port", 9324, "Base port for SQS / ElasticMQ")
 	flag.Parse()
 
 	instance.region = "us-west-2"
@@ -62,6 +65,10 @@ func Region() string {
 	return instance.region
 }
 
-func S3() S3Settings {
+func S3() HostSettings {
 	return instance.s3
+}
+
+func SQS() HostSettings {
+	return instance.sqs
 }

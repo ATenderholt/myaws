@@ -76,6 +76,7 @@ func (h *RegexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, route := range h.serviceRoutes {
 		if *route.service == service && route.method == r.Method {
 			route.handler.ServeHTTP(w, r)
+			return
 		}
 	}
 

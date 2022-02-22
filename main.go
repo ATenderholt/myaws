@@ -7,6 +7,7 @@ import (
 	"myaws/http"
 	"myaws/lambda"
 	"myaws/log"
+	"myaws/moto"
 	"myaws/s3"
 	"myaws/sqs"
 	"os"
@@ -81,6 +82,12 @@ func initializeDocker() {
 
 	docker.EnsureImage(sqs.Image)
 	err = docker.Start(sqs.Container)
+	if err != nil {
+		panic(err)
+	}
+
+	docker.EnsureImage(moto.Image)
+	err = docker.Start(moto.Container)
 	if err != nil {
 		panic(err)
 	}

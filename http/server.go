@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"myaws/iam"
 	"myaws/lambda"
 	"myaws/log"
 	"myaws/s3"
@@ -13,6 +14,8 @@ func Serve() (srv *http.Server, err error) {
 	mux := http.NewServeMux()
 
 	handler := RegexHandler{}
+
+	handler.HandleAuthHeader("iam", http.MethodPost, iam.Handler)
 
 	handler.HandleRegex(lambda.GetAllLayerVersionsRegex, http.MethodGet, lambda.GetAllLayerVersions)
 	handler.HandleRegex(lambda.GetLayerVersionsRegex, http.MethodGet, lambda.GetLayerVersion)

@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,6 +9,7 @@ import (
 	"myaws/config"
 	"myaws/log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -22,8 +22,9 @@ func ProxyToMinio(response http.ResponseWriter, request *http.Request) {
 
 func proxyToMinio(response *http.ResponseWriter, request *http.Request, region string) error {
 	url := fmt.Sprintf("http://%s:%d%s", config.S3().Host, config.S3().Port, request.URL.Path)
-	body, _ := io.ReadAll(request.Body)
-	proxyReq, _ := http.NewRequest(request.Method, url, bytes.NewReader(body))
+	var stringBuilder strings.Builder
+	reader := io.TeeReader(request.Body, &stringBuilder)
+	proxyReq, _ := http.NewRequest(request.Method, url, reader)
 
 	credentials := aws.Credentials{AccessKeyID: "minio", SecretAccessKey: "miniosecret"}
 
@@ -45,6 +46,10 @@ func proxyToMinio(response *http.ResponseWriter, request *http.Request, region s
 	}
 
 	log.Info("Got following response from Minio: %+v", resp)
+	if resp.StatusCode != 200 {
+		log.Info("Request payload: %s", stringBuilder.String())
+	}
+
 	defer resp.Body.Close()
 
 	for key, value := range resp.Header {

@@ -5,25 +5,32 @@ import (
 	"fmt"
 	"io"
 	"myaws/config"
+	"myaws/database"
 	"myaws/log"
+	"myaws/moto/types"
 	"net/http"
 	"strings"
 )
 
-func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service string) error {
+func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service string) (in string, out string, err error) {
 	log.Info("Proxying %s request to moto ...", service)
 
 	url := fmt.Sprintf("http://%s:%d%s", config.Moto().Host, config.Moto().Port, request.URL.Path)
-	proxyReq, _ := http.NewRequest(request.Method, url, request.Body)
-	proxyReq.Header.Set("Content-Type", request.Header.Get("Content-Type"))
-	//proxyReq.Header.Set("Host", "https://iam.us-west-2.amazonaws.com")
-	proxyReq.Header.Set("Authorization", request.Header.Get("Authorization"))
+
+	var proxyRequestBody strings.Builder
+	requestBody := io.TeeReader(request.Body, &proxyRequestBody)
+	authorization := request.Header.Get("Authorization")
+	contentType := request.Header.Get("Content-Type")
+
+	proxyReq, _ := http.NewRequest(request.Method, url, requestBody)
+	proxyReq.Header.Set("Content-Type", contentType)
+	proxyReq.Header.Set("Authorization", authorization)
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
 		msg := log.Error("Problem proxying to Moto: %v", err)
-		return errors.New(msg)
+		return proxyRequestBody.String(), "", errors.New(msg)
 	}
 
 	log.Info("Got following response from Moto: %+v", resp)
@@ -35,15 +42,29 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 
 	}
 
+	ctx := request.Context()
+	db := database.CreateConnection()
+	defer db.Close()
+
+	apiRequest := types.ApiRequest{
+		Service:       service,
+		Authorization: authorization,
+		ContentType:   contentType,
+		Payload:       proxyRequestBody.String(),
+	}
+
+	err = InsertRequest(ctx, db, &apiRequest)
+	if err != nil {
+		msg := log.Error("Unable to insert request for %s: %v", apiRequest.Service, err)
+		return proxyRequestBody.String(), apiRequest.Payload, errors.New(msg)
+	}
+
 	(*response).WriteHeader(resp.StatusCode)
-	var stringBuilder strings.Builder
-	body := io.TeeReader(resp.Body, &stringBuilder)
+
+	var responseBody strings.Builder
+	body := io.TeeReader(resp.Body, &responseBody)
 	io.Copy(*response, body)
 	resp.Body.Close()
 
-	if resp.Header.Get("Content-Type") == "text/html; charset=utf-8" {
-		log.Info("Response from Moto: %s", stringBuilder.String())
-	}
-
-	return nil
+	return proxyRequestBody.String(), apiRequest.Payload, nil
 }

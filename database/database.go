@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"myaws/config"
 	"myaws/log"
@@ -47,8 +48,32 @@ func (db *Database) BeginTx(ctx context.Context) (*Transaction, error) {
 	return &Transaction{tx}, nil
 }
 
-func (db *Database) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return db.wrapped.ExecContext(ctx, query, args...)
+func (db *Database) InsertOne(ctx context.Context, query string, args ...interface{}) (int64, error) {
+	insert, err := db.wrapped.ExecContext(ctx, query, args...)
+	if err != nil {
+		debug := buildDebug(query, args)
+		msg := log.Error("unable to insert %s: %s", debug, err)
+		return -1, errors.New(msg)
+	}
+
+	count, err := insert.RowsAffected()
+	if err != nil {
+		msg := log.Error("unexpected error when inserting: %v", err)
+		return -1, errors.New(msg)
+	}
+
+	if count != 1 {
+		msg := log.Error("expected only 1 insert but got %d", count)
+		return -1, errors.New(msg)
+	}
+
+	id, err := insert.LastInsertId()
+	if err != nil {
+		msg := log.Error("unexpected error when inserting")
+		return -1, errors.New(msg)
+	}
+
+	return id, nil
 }
 
 func (db *Database) Exec(query string, args ...interface{}) (sql.Result, error) {

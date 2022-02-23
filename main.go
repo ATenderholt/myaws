@@ -68,6 +68,7 @@ func start(ctx context.Context) error {
 func initializeDb() {
 	var migrations database.Migrations
 	migrations.AddAll(lambda.Migrations)
+	migrations.AddAll(moto.Migrations)
 
 	log.Info("Initializing DB with %d Migrations.", migrations.Size())
 	database.Initialize(migrations)

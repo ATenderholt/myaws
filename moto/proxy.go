@@ -48,6 +48,8 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 
 	apiRequest := types.ApiRequest{
 		Service:       service,
+		Method:        request.Method,
+		Path:          request.URL.Path,
 		Authorization: authorization,
 		ContentType:   contentType,
 		Payload:       proxyRequestBody.String(),
@@ -67,4 +69,25 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 	resp.Body.Close()
 
 	return proxyRequestBody.String(), apiRequest.Payload, nil
+}
+
+func ReplayToMoto(request types.ApiRequest) error {
+	log.Info("Replaying %s request to moto ...", request.Service)
+
+	url := fmt.Sprintf("http://%s:%d%s", config.Moto().Host, config.Moto().Port, request.Path)
+
+	proxyReq, _ := http.NewRequest(request.Method, url, strings.NewReader(request.Payload))
+	proxyReq.Header.Set("Content-Type", request.ContentType)
+	proxyReq.Header.Set("Authorization", request.Authorization)
+
+	client := &http.Client{}
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		msg := errorMessage(&request, err)
+		log.Error(msg)
+		return errors.New(msg)
+	}
+
+	log.Info("Got following response from Moto: %+v", resp)
+	return nil
 }

@@ -1,6 +1,7 @@
 package moto
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -72,7 +73,7 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 }
 
 func ReplayToMoto(request types.ApiRequest) error {
-	log.Info("Replaying %s request to moto ...", request.Service)
+	log.Info("Replaying %s request #%d to moto ...", request.Service, request.ID)
 
 	url := fmt.Sprintf("http://%s:%d%s", config.Moto().Host, config.Moto().Port, request.Path)
 
@@ -90,4 +91,35 @@ func ReplayToMoto(request types.ApiRequest) error {
 
 	log.Info("Got following response from Moto: %+v", resp)
 	return nil
+}
+
+func ReplayAllToMoto(ctx context.Context) error {
+	log.Info("Replaying all requests to moto ...")
+
+	db := database.CreateConnection()
+	defer db.Close()
+
+	dbCtx, cancel := context.WithCancel(ctx)
+	results, done, errs := FindAllRequests(dbCtx, db)
+	for {
+		select {
+		case result := <-results:
+			err := ReplayToMoto(result)
+			if err != nil {
+				cancel()
+				msg := log.Error("Unable to replay to moto requests: %v", err)
+				return errors.New(msg)
+			}
+		case err := <-errs:
+			cancel()
+			if err != nil {
+				msg := log.Error("Unable to replay to requests: %v", err)
+				return errors.New(msg)
+			}
+		case <-done:
+			cancel()
+			log.Info("Done replaying moto requests.")
+			return nil
+		}
+	}
 }

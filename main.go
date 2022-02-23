@@ -75,8 +75,15 @@ func initializeDb() {
 }
 
 func initializeDocker() {
+	// start moto first so a few seconds pass before trying to replay its events - potentially fragile!
+	docker.EnsureImage(moto.Image)
+	err := docker.Start(moto.Container)
+	if err != nil {
+		panic(err)
+	}
+
 	docker.EnsureImage(s3.Image)
-	err := docker.Start(s3.Container)
+	err = docker.Start(s3.Container)
 	if err != nil {
 		panic(err)
 	}
@@ -87,8 +94,7 @@ func initializeDocker() {
 		panic(err)
 	}
 
-	docker.EnsureImage(moto.Image)
-	err = docker.Start(moto.Container)
+	err = moto.ReplayAllToMoto(context.Background())
 	if err != nil {
 		panic(err)
 	}

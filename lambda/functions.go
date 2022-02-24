@@ -1,6 +1,8 @@
 package lambda
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -61,6 +63,8 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 
 	function := types.CreateFunction(&body)
 	function.Version = strconv.Itoa(dbVersion + 1)
+	rawHash := sha256.Sum256(code.ZipFile)
+	function.CodeSha256 = base64.StdEncoding.EncodeToString(rawHash[:])
 
 	// TODO : validate Layer runtime support
 

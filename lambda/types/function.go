@@ -138,6 +138,15 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 
 func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 	lastModified := timeMillisToString(f.LastModified)
+	layers := make([]aws.Layer, len(f.Layers))
+	for i, layer := range f.Layers {
+		layers[i] = aws.Layer{
+			Arn:                      layer.GetVersionArn(),
+			CodeSize:                 layer.CodeSize,
+			SigningJobArn:            nil,
+			SigningProfileVersionArn: nil,
+		}
+	}
 
 	return &aws.FunctionConfiguration{
 		Architectures:              nil,
@@ -156,7 +165,7 @@ func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 		LastUpdateStatus:           "",
 		LastUpdateStatusReason:     nil,
 		LastUpdateStatusReasonCode: "",
-		Layers:                     nil,
+		Layers:                     layers,
 		MasterArn:                  nil,
 		MemorySize:                 &f.MemorySize,
 		PackageType:                "Zip",

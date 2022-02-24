@@ -112,6 +112,14 @@ func GetLambdaFunction(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	layers, err := queries.GetLayersForFunction(ctx, db, function)
+	if err != nil {
+		msg := log.Error("Unable to load Layers for Function %s: %v", name, err)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
+	}
+
+	function.Layers = layers
 	result := function.ToGetFunctionOutput()
 
 	utils.RespondWithJson(response, result)

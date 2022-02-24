@@ -71,6 +71,26 @@ func InsertFunction(ctx context.Context, db *database.Database, function *types.
 		return nil, errors.New(msg)
 	}
 
+	layerStmt, err := tx.PrepareContext(
+		ctx,
+		`INSERT INTO lambda_function_layer (function_id, layer_name, layer_version) VALUES (?, ?, ?)`,
+	)
+	if err != nil {
+		msg := tx.Rollback("unable to create statement to add layers to function %s", function.FunctionName)
+		log.Error(msg)
+		return nil, errors.New(msg)
+	}
+	defer layerStmt.Close()
+
+	for _, layer := range function.Layers {
+		_, err := layerStmt.ExecContext(ctx, functionId, layer.Name, layer.Version)
+		if err != nil {
+			msg := tx.Rollback("unable to add layer %s to function %s: %v", layer.Name, function.FunctionName, err)
+			log.Error(msg)
+			return nil, errors.New(msg)
+		}
+	}
+
 	tagsStmt, err := tx.PrepareContext(
 		ctx,
 		`INSERT INTO lambda_function_tag (function_id, key, value) VALUES (?, ?, ?)`,
@@ -80,7 +100,7 @@ func InsertFunction(ctx context.Context, db *database.Database, function *types.
 	for key, value := range function.Tags {
 		_, err := tagsStmt.ExecContext(ctx, functionId, key, value)
 		if err != nil {
-			msg := tx.Rollback("unable to add tag %s to function %s: %v", key, err)
+			msg := tx.Rollback("unable to add tag %s to function %s: %v", key, function.FunctionName, err)
 			log.Error(msg)
 			return nil, errors.New(msg)
 		}
@@ -223,4 +243,42 @@ func FunctionVersionsByName(ctx context.Context, db *database.Database, name str
 	}
 
 	return results, nil
+}
+
+func GetLayersForFunction(ctx context.Context, db *database.Database, function *types.Function) ([]types.LambdaLayer, error) {
+	log.Info("Querying for Layers of Function %s ...", function.FunctionName)
+	layers := []types.LambdaLayer{}
+
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT layer_name, layer_version, code_size FROM lambda_function_layer AS lfl
+					JOIN lambda_layer AS ll
+						ON lfl.layer_name = ll.name AND lfl.layer_version = ll.version
+				WHERE lfl.function_id = ?
+		`,
+		function.ID,
+	)
+
+	switch {
+	case err == sql.ErrNoRows:
+		log.Info("... no layers were found for Function %s.", function.FunctionName)
+		return layers, nil
+	case err != nil:
+		msg := log.Error("Error when querying for Layers of Function %s: %v", function.FunctionName, err)
+		return nil, errors.New(msg)
+	}
+
+	for rows.Next() {
+		var layer types.LambdaLayer
+		err := rows.Scan(&layer.Name, &layer.Version, &layer.CodeSize)
+		if err != nil {
+			msg := log.Error("Error when scanning Layer results for Function %s: %v", function.FunctionName, err)
+			return layers, errors.New(msg)
+		}
+
+		layers = append(layers, layer)
+	}
+
+	log.Info("... Found %d Layers for Function %s.", len(layers), function.FunctionName)
+	return layers, nil
 }

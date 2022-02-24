@@ -81,9 +81,11 @@ var Migrations = []database.Migration{
 				CREATE TABLE IF NOT EXISTS lambda_function_layer (
 					id					integer primary key autoincrement,
 					function_id 		integer not null,
-					layer_id			integer not null,
+					layer_name			text not null,
+					layer_version		integer not null,
 					FOREIGN KEY(function_id) REFERENCES lambda_function(id),
-					FOREIGN KEY(layer_id) REFERENCES lambda_layer(id)
+					FOREIGN KEY(layer_name) REFERENCES lambda_layer(name),
+				    FOREIGN KEY(layer_version) REFERENCES lambda_layer(version)
 				);
 		`,
 	},

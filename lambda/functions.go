@@ -77,6 +77,13 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 	}
 
 	layerDestPath := function.GetLayerDestPath()
+	err = utils.CreateDirs(layerDestPath)
+	if err != nil {
+		msg := log.Error("Unable to create Layer path for Function %s: %v", function.FunctionName, err)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
+	}
+
 	for _, layer := range function.Layers {
 		layerPath := layer.GetDestPath()
 		err = utils.UncompressZipFile(layerPath, layerDestPath)

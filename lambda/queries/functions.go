@@ -282,3 +282,43 @@ func GetLayersForFunction(ctx context.Context, db *database.Database, function *
 	log.Info("... Found %d Layers for Function %s.", len(layers), function.FunctionName)
 	return layers, nil
 }
+
+func LatestFunctions(ctx context.Context, db *database.Database) ([]types.Function, error) {
+	log.Info("Querying for latest version of all Functions ...")
+
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT name, max(version), runtime FROM lambda_function GROUP BY name`,
+	)
+
+	var results []types.Function
+
+	switch {
+	case err == sql.ErrNoRows:
+		log.Error("No Functions were found")
+		return results, nil
+	case err != nil:
+		msg := log.Error("Unable to find Functions: %v", err)
+		return results, errors.New(msg)
+	}
+
+	for rows.Next() {
+		var function types.Function
+
+		err := rows.Scan(
+			&function.FunctionName,
+			&function.Version,
+			&function.Runtime,
+		)
+
+		if err != nil {
+			msg := log.Error("Unable to scan Function row #%d", len(results))
+			return results, errors.New(msg)
+		}
+
+		results = append(results, function)
+	}
+
+	log.Info("... found %d Functions.", len(results))
+	return results, nil
+}

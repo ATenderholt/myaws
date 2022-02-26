@@ -6,6 +6,7 @@ import (
 	"myaws/docker"
 	"myaws/http"
 	"myaws/lambda"
+	"myaws/lambda/queries"
 	"myaws/log"
 	"myaws/moto"
 	"myaws/s3"
@@ -37,7 +38,7 @@ func start(ctx context.Context) error {
 	log.Info("Starting up ...")
 
 	initializeDb()
-	initializeDocker()
+	initializeDocker(ctx)
 	server, err := http.Serve()
 	if err != nil {
 		panic(err)
@@ -74,7 +75,7 @@ func initializeDb() {
 	database.Initialize(migrations)
 }
 
-func initializeDocker() {
+func initializeDocker(ctx context.Context) {
 	// start moto first so a few seconds pass before trying to replay its events - potentially fragile!
 	docker.EnsureImage(moto.Image)
 	err := docker.Start(moto.Container)
@@ -94,8 +95,23 @@ func initializeDocker() {
 		panic(err)
 	}
 
-	err = moto.ReplayAllToMoto(context.Background())
+	err = moto.ReplayAllToMoto(ctx)
 	if err != nil {
 		panic(err)
+	}
+
+	docker.EnsureImage("mlupin/docker-lambda:python3.8")
+
+	db := database.CreateConnection()
+	functions, err := queries.LatestFunctions(ctx, db)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, function := range functions {
+		err := lambda.StartFunction(&function)
+		if err != nil {
+			panic(err)
+		}
 	}
 }

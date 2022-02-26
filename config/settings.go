@@ -17,9 +17,10 @@ type Settings struct {
 	debug         bool
 	region        string
 
-	moto HostSettings
-	s3   HostSettings
-	sqs  HostSettings
+	lambda HostSettings
+	moto   HostSettings
+	s3     HostSettings
+	sqs    HostSettings
 }
 
 var instance Settings
@@ -29,6 +30,7 @@ func init() {
 	flag.StringVar(&instance.accountNumber, "account-number", "271828182845", "Account number")
 	flag.StringVar(&instance.dataPath, "data-path", "data", "Path to data directory")
 	flag.BoolVar(&instance.debug, "debug", false, "Enable trace debugging")
+	flag.IntVar(&instance.lambda.Port, "lambda-port", 9002, "Base port for Lambda functions")
 	flag.StringVar(&instance.s3.Host, "s3-host", "localhost", "Host for S3 / minio")
 	flag.IntVar(&instance.s3.Port, "s3-port", 9000, "Base port for S3 / minio")
 	flag.StringVar(&instance.sqs.Host, "sqs-host", "localhost", "Host for SQS / ElasticMQ")
@@ -67,6 +69,10 @@ func IsDebug() bool {
 
 func Region() string {
 	return instance.region
+}
+
+func Lambda() HostSettings {
+	return instance.lambda
 }
 
 func Moto() HostSettings {

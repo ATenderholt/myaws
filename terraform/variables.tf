@@ -4,6 +4,7 @@ variable "endpoints" {
     lambda = string
     s3     = string
     sqs    = string
+    ssm    = string
     sts    = string
   })
 }

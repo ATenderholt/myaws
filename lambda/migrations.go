@@ -89,4 +89,9 @@ var Migrations = []database.Migration{
 				);
 		`,
 	},
+	{
+		Service:     "Lambda",
+		Description: "Unique constraint on Function environment",
+		Query:       `CREATE UNIQUE INDEX uk_environment ON lambda_function_environment(function_id, key)`,
+	},
 }

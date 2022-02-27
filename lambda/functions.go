@@ -2,6 +2,7 @@ package lambda
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -103,6 +104,56 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 func getFunctionName(path string) string {
 	parts := strings.Split(path, "/")
 	return parts[3]
+}
+
+const PutLambdaConfigurationRegex = "^/2015-03-31/functions/[A-Za-z0-9_-]+/configuration$"
+
+func PutLambdaConfiguration(response http.ResponseWriter, request *http.Request) {
+	name := getFunctionName(request.URL.Path)
+
+	log.Info("Setting configuration for Lambda Function %s ...", name)
+
+	decoder := json.NewDecoder(request.Body)
+	defer request.Body.Close()
+
+	var body lambda.UpdateFunctionConfigurationInput
+	err := decoder.Decode(&body)
+	if err != nil {
+		msg := log.Error("Error when decoding body: %v", err)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
+	}
+
+	log.Info("Configuration: %+v", body)
+
+	ctx := request.Context()
+	db := database.CreateConnection()
+	defer db.Close()
+
+	function, err := queries.LatestFunctionByName(ctx, db, name)
+
+	switch {
+	case err == sql.ErrNoRows:
+		log.Info("Unable to find Function named %s", name)
+		http.NotFound(response, request)
+		return
+	case err != nil:
+		msg := log.Error("Error when querying for Function %s: %v", name, err)
+		http.Error(response, msg, http.StatusInternalServerError)
+		return
+	}
+
+	if body.Environment != nil {
+		err = queries.UpsertFunctionEnvironment(ctx, db, function, body.Environment)
+		if err != nil {
+			msg := log.Error("Error when upserting Environment for Function %s: %v", name, err)
+			http.Error(response, msg, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	result := function.ToUpdateFunctionConfigurationOutput()
+	utils.RespondWithJson(response, result)
 }
 
 const GetLambdaFunctionRegex = `^/2015-03-31/functions/[A-Za-z0-9_-]+$`

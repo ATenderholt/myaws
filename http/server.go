@@ -24,6 +24,7 @@ func Serve() (srv *http.Server, err error) {
 	handler.HandleRegex(lambda.GetFunctionCodeSigningRegex, http.MethodGet, lambda.GetFunctionCodeSigning)
 	handler.HandleRegex(lambda.GetFunctionVersionsRegex, http.MethodGet, lambda.GetFunctionVersions)
 	handler.HandleRegex(lambda.PostLambdaFunctionRegex, http.MethodPost, lambda.PostLambdaFunction)
+	handler.HandleRegex(lambda.PutLambdaConfigurationRegex, http.MethodPut, lambda.PutLambdaConfiguration)
 
 	handler.HandleAuthHeader("s3", http.MethodHead, s3.ProxyToMinio)
 	handler.HandleAuthHeader("s3", http.MethodGet, s3.ProxyToMinio)

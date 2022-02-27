@@ -76,6 +76,9 @@ func StartFunction(function *types.Function) error {
 				Consistency: mount.ConsistencyDelegated,
 			},
 		},
+		Environment: []string{
+			"DOCKER_LAMBDA_STAY_OPEN=1",
+		},
 		Ports: map[int]int{
 			9001: port,
 		},

@@ -47,4 +47,10 @@ resource "aws_lambda_function" "copy_file" {
   handler          = "main.handle"
   filename         = data.archive_file.copy_file.output_path
   source_code_hash = data.archive_file.copy_file.output_base64sha256
+
+  environment {
+    variables = {
+      ENDPOINT = "http://localhost:8080"
+    }
+  }
 }

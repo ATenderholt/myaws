@@ -174,7 +174,7 @@ func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 		Runtime:                    f.Runtime,
 		SigningJobArn:              nil,
 		SigningProfileVersionArn:   nil,
-		State:                      "Active",
+		State:                      aws.StateActive,
 		StateReason:                nil,
 		StateReasonCode:            "",
 		Timeout:                    &f.Timeout,
@@ -195,6 +195,54 @@ func (f *Function) ToGetFunctionOutput() *lambda.GetFunctionOutput {
 		Configuration:  config,
 		Tags:           nil,
 		ResultMetadata: middleware.Metadata{},
+	}
+}
+
+func (f *Function) ToUpdateFunctionConfigurationOutput() *lambda.UpdateFunctionConfigurationOutput {
+	lastModified := timeMillisToString(f.LastModified)
+	layers := make([]aws.Layer, len(f.Layers))
+	for i, layer := range f.Layers {
+		layers[i] = aws.Layer{
+			Arn:                      layer.GetVersionArn(),
+			CodeSize:                 layer.CodeSize,
+			SigningJobArn:            nil,
+			SigningProfileVersionArn: nil,
+		}
+	}
+
+	return &lambda.UpdateFunctionConfigurationOutput{
+		Architectures:              nil,
+		CodeSha256:                 &f.CodeSha256,
+		CodeSize:                   f.CodeSize,
+		DeadLetterConfig:           nil,
+		Description:                &f.Description,
+		Environment:                &aws.EnvironmentResponse{Variables: f.Environment.Variables},
+		FileSystemConfigs:          nil,
+		FunctionArn:                f.GetArn(),
+		FunctionName:               &f.FunctionName,
+		Handler:                    &f.Handler,
+		ImageConfigResponse:        nil,
+		KMSKeyArn:                  nil,
+		LastModified:               &lastModified,
+		LastUpdateStatus:           aws.LastUpdateStatusSuccessful,
+		LastUpdateStatusReason:     nil,
+		LastUpdateStatusReasonCode: "",
+		Layers:                     layers,
+		MasterArn:                  nil,
+		MemorySize:                 &f.MemorySize,
+		PackageType:                "Zip",
+		RevisionId:                 nil,
+		Role:                       &f.Role,
+		Runtime:                    f.Runtime,
+		SigningJobArn:              nil,
+		SigningProfileVersionArn:   nil,
+		State:                      aws.StateActive,
+		StateReason:                nil,
+		StateReasonCode:            "",
+		Timeout:                    &f.Timeout,
+		TracingConfig:              nil,
+		Version:                    &f.Version,
+		VpcConfig:                  nil,
 	}
 }
 

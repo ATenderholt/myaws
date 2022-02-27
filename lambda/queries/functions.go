@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	aws "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"myaws/database"
 	"myaws/lambda/types"
 	"myaws/log"
@@ -158,6 +159,8 @@ func InsertFunction(ctx context.Context, db *database.Database, function *types.
 }
 
 func LatestFunctionByName(ctx context.Context, db *database.Database, name string) (*types.Function, error) {
+	log.Info("Querying for Latest Function %s ... ", name)
+
 	var function types.Function
 	err := db.QueryRowContext(
 		ctx,
@@ -183,17 +186,44 @@ func LatestFunctionByName(ctx context.Context, db *database.Database, name strin
 
 	switch {
 	case err == sql.ErrNoRows:
-		log.Info("Querying function %s returned 0 rows.", name)
+		log.Info("... found 0 rows for Function %s.", name)
 		return nil, err
 	case err != nil:
-		msg := log.Error("Error when querying for Function %s: %v", name, err)
+		msg := log.Error("... error when querying for Function %s: %v", name, err)
 		return nil, errors.New(msg)
 	}
 
-	log.Info("found function: %+v", function)
-	log.Info("setting function %s version to $LATEST", name)
+	log.Info("Found Function: %+v", function)
+	log.Info("Setting Function %s version to $LATEST", name)
 
 	function.Version = "$LATEST"
+	function.Environment = &aws.Environment{Variables: make(map[string]string)}
+
+	log.Info("Querying environment for Function %s ...", name)
+
+	results, err := db.QueryContext(
+		ctx,
+		`SELECT key, value FROM lambda_function_environment WHERE function_id=?`,
+		function.ID,
+	)
+	switch {
+	case err == sql.ErrNoRows:
+		log.Info("No Environment was found for Function %s", function.FunctionName)
+	case err != nil:
+		msg := log.Error("Unable to get Environment for Function %s: %v", function.FunctionName, err)
+		return nil, errors.New(msg)
+	}
+
+	for results.Next() {
+		var key, value string
+		err = results.Scan(&key, &value)
+		if err != nil {
+			msg := log.Error("Unable to Scan Environment for Function %s: %v", function.FunctionName, err)
+			return nil, errors.New(msg)
+		}
+
+		function.Environment.Variables[key] = value
+	}
 
 	return &function, nil
 }
@@ -321,4 +351,112 @@ func LatestFunctions(ctx context.Context, db *database.Database) ([]types.Functi
 
 	log.Info("... found %d Functions.", len(results))
 	return results, nil
+}
+
+func UpsertFunctionEnvironment(ctx context.Context, db *database.Database, function *types.Function, environment *aws.Environment) error {
+	log.Info("Upserting Environment for Function %s ...", function.FunctionName)
+
+	adds := make(map[string]string)
+	removes := make(map[string]string)
+	updates := make(map[string]string)
+
+	for key, value := range environment.Variables {
+		_, exists := function.Environment.Variables[key]
+		if exists {
+			updates[key] = value
+		} else {
+			adds[key] = value
+		}
+	}
+
+	for key, value := range function.Environment.Variables {
+		_, exists := environment.Variables[key]
+		if !exists {
+			removes[key] = value
+		}
+	}
+
+	if len(adds) == 0 && len(removes) == 0 && len(updates) == 0 {
+		log.Info("No changes to Environment for Function %s", function.FunctionName)
+		return nil
+	}
+
+	log.Info(" ... %d adds, %d updates, %d removes ...", len(adds), len(updates), len(removes))
+
+	tx, err := db.BeginTx(ctx)
+	if err != nil {
+		msg := log.Error("Unable to begin transaction to change Environment for Function %s: %v", function.FunctionName, err)
+		return errors.New(msg)
+	}
+
+	addStmt, updateStmt, removeStmt, err := prepareEnvironmentUpdateStatements(ctx, tx)
+	if err != nil {
+		msg := log.Error("Unable to create statements to change Environment for Function %s: %v", function.FunctionName, err)
+		return errors.New(msg)
+	}
+	defer addStmt.Close()
+	defer updateStmt.Close()
+	defer removeStmt.Close()
+
+	for key, value := range adds {
+		_, err = addStmt.ExecContext(ctx, function.ID, key, value)
+		if err != nil {
+			msg := tx.Rollback("Unable to add Environment %s=%s to Function %s: %v", key, value, function.ID, err)
+			return errors.New(msg)
+		}
+	}
+
+	for key, value := range updates {
+		_, err = updateStmt.ExecContext(ctx, value, function.ID, key)
+		if err != nil {
+			msg := tx.Rollback("Unable to update Environment %s=%s for Function %s: %v", key, value, function.ID, err)
+			return errors.New(msg)
+		}
+	}
+
+	for key, value := range removes {
+		_, err = removeStmt.ExecContext(ctx, function.ID, key)
+		if err != nil {
+			msg := tx.Rollback("Unable to update Environment %s=%s for Function %s: %v", key, value, function.ID, err)
+			return errors.New(msg)
+		}
+	}
+
+	err = tx.Commit()
+
+	if err != nil {
+		msg := log.Error("Unable to commit Environment changes for Function %s: %v", function.FunctionName, err)
+		return errors.New(msg)
+	}
+
+	function.Environment = environment
+
+	log.Info(" ... finished.")
+
+	return nil
+}
+
+func prepareEnvironmentUpdateStatements(ctx context.Context, tx *database.Transaction) (add *sql.Stmt, update *sql.Stmt, remove *sql.Stmt, err error) {
+	add, err = tx.PrepareContext(ctx, `INSERT INTO lambda_function_environment (function_id, key, value) VALUES (?, ?, ?)`)
+	if err != nil {
+		msg := log.Error("Unable to create add statement to change Environment: %v", err)
+		err = errors.New(msg)
+		return
+	}
+
+	update, err = tx.PrepareContext(ctx, `UPDATE lambda_function_environment SET value=? WHERE function_id=? AND key=?`)
+	if err != nil {
+		msg := log.Error("Unable to create update statement to change Environment: %v", err)
+		err = errors.New(msg)
+		return
+	}
+
+	remove, err = tx.PrepareContext(ctx, `DELETE FROM lambda_function_environment WHERE function_id=? AND key=?`)
+	if err != nil {
+		msg := log.Error("Unable to create remove statement to change Environment: %v", err)
+		err = errors.New(msg)
+		return
+	}
+
+	return
 }

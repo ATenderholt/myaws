@@ -197,10 +197,21 @@ func LatestFunctionByName(ctx context.Context, db *database.Database, name strin
 	log.Info("Setting Function %s version to $LATEST", name)
 
 	function.Version = "$LATEST"
-	function.Environment = &aws.Environment{Variables: make(map[string]string)}
 
-	log.Info("Querying environment for Function %s ...", name)
+	environment, err := GetEnvironmentForFunction(ctx, db, &function)
+	if err != nil {
+		return nil, err
+	}
 
+	function.Environment = environment
+
+	return &function, nil
+}
+
+func GetEnvironmentForFunction(ctx context.Context, db *database.Database, function *types.Function) (*aws.Environment, error) {
+	log.Info("Querying environment for Function %s ...", function.FunctionName)
+
+	variables := make(map[string]string)
 	results, err := db.QueryContext(
 		ctx,
 		`SELECT key, value FROM lambda_function_environment WHERE function_id=?`,
@@ -222,10 +233,10 @@ func LatestFunctionByName(ctx context.Context, db *database.Database, name strin
 			return nil, errors.New(msg)
 		}
 
-		function.Environment.Variables[key] = value
+		variables[key] = value
 	}
 
-	return &function, nil
+	return &aws.Environment{Variables: variables}, nil
 }
 
 func FunctionVersionsByName(ctx context.Context, db *database.Database, name string) ([]types.Function, error) {
@@ -268,6 +279,15 @@ func FunctionVersionsByName(ctx context.Context, db *database.Database, name str
 			msg := log.Error("Error when scanning row %d for Function %s: %v", progress, name, err)
 			return nil, errors.New(msg)
 		}
+
+		environment, err := GetEnvironmentForFunction(ctx, db, &function)
+		if err != nil {
+			progress := len(results)
+			msg := log.Error("Error when hydrating row %d for Function %s: %v", progress, name, err)
+			return nil, errors.New(msg)
+		}
+
+		function.Environment = environment
 
 		results = append(results, function)
 	}

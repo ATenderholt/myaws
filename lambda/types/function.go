@@ -154,7 +154,7 @@ func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 		CodeSize:                   f.CodeSize,
 		DeadLetterConfig:           nil,
 		Description:                &f.Description,
-		Environment:                nil,
+		Environment:                &aws.EnvironmentResponse{Variables: f.Environment.Variables},
 		FileSystemConfigs:          nil,
 		FunctionArn:                f.GetArn(),
 		FunctionName:               &f.FunctionName,

@@ -7,6 +7,7 @@ import (
 	"myaws/log"
 	"myaws/s3"
 	"myaws/sqs"
+	"myaws/ssm"
 	"net/http"
 )
 
@@ -30,6 +31,9 @@ func Serve() (srv *http.Server, err error) {
 	handler.HandleAuthHeader("s3", http.MethodGet, s3.ProxyToMinio)
 	handler.HandleAuthHeader("s3", http.MethodPut, s3.ProxyToMinio)
 	handler.HandleAuthHeader("s3", http.MethodDelete, s3.ProxyToMinio)
+
+	handler.HandleAuthHeader("ssm", http.MethodPost, ssm.Handler)
+
 	handler.HandleAuthHeader("sqs", http.MethodPost, sqs.ProxyToElasticMQ)
 
 	mux.Handle("/", &handler)

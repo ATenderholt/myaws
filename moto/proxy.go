@@ -23,10 +23,14 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 	requestBody := io.TeeReader(request.Body, &proxyRequestBody)
 	authorization := request.Header.Get("Authorization")
 	contentType := request.Header.Get("Content-Type")
+	target := request.Header.Get("X-Amz-Target")
 
 	proxyReq, _ := http.NewRequest(request.Method, url, requestBody)
 	proxyReq.Header.Set("Content-Type", contentType)
 	proxyReq.Header.Set("Authorization", authorization)
+	if len(target) > 0 {
+		proxyReq.Header.Set("X-Amz-Target", target)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)

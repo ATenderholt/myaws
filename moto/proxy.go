@@ -8,6 +8,7 @@ import (
 	"myaws/config"
 	"myaws/database"
 	"myaws/log"
+	"myaws/moto/queries"
 	"myaws/moto/types"
 	"net/http"
 	"strings"
@@ -56,7 +57,7 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 		Payload:       proxyRequestBody.String(),
 	}
 
-	err = InsertRequest(ctx, db, &apiRequest)
+	err = queries.InsertRequest(ctx, db, &apiRequest)
 	if err != nil {
 		msg := log.Error("Unable to insert request for %s: %v", apiRequest.Service, err)
 		return proxyRequestBody.String(), apiRequest.Payload, errors.New(msg)
@@ -84,7 +85,7 @@ func ReplayToMoto(request types.ApiRequest) error {
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
-		msg := errorMessage(&request, err)
+		msg := queries.ErrorMessage(&request, err)
 		log.Error(msg)
 		return errors.New(msg)
 	}
@@ -100,7 +101,7 @@ func ReplayAllToMoto(ctx context.Context) error {
 	defer db.Close()
 
 	dbCtx, cancel := context.WithCancel(ctx)
-	results, done, errs := FindAllRequests(dbCtx, db)
+	results, done, errs := queries.FindAllRequests(dbCtx, db)
 	for {
 		select {
 		case result := <-results:

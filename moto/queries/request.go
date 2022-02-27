@@ -1,4 +1,4 @@
-package moto
+package queries
 
 import (
 	"context"
@@ -28,7 +28,7 @@ func InsertRequest(ctx context.Context, db *database.Database, apiRequest *types
 	)
 
 	if err != nil {
-		msg := errorMessage(apiRequest, err)
+		msg := ErrorMessage(apiRequest, err)
 		log.Error(msg)
 		return errors.New(msg)
 	}

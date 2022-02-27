@@ -1,11 +1,11 @@
-package moto
+package queries
 
 import (
 	"myaws/moto/types"
 	"strings"
 )
 
-func errorMessage(apiRequest *types.ApiRequest, err error) string {
+func ErrorMessage(apiRequest *types.ApiRequest, err error) string {
 	var builder strings.Builder
 	builder.WriteString("unable to insert request for ")
 	builder.WriteString(apiRequest.Service)

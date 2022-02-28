@@ -7,18 +7,18 @@ import (
 )
 
 func Handler(response http.ResponseWriter, request *http.Request) {
-	req, resp, err := moto.ProxyToMoto(&response, request, "ssm")
-	if err == nil {
+	in, out, err := moto.ProxyToMoto(&response, request, "ssm")
+	log.Debug("SSM Request Payload: %s", in)
+	log.Debug("SSM Response Body: %s", out)
+
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if len(req) > 0 {
-		log.Error("SSM Request: ", req)
+	err = moto.InsertRequest("ssm", request, in)
+	if err != nil {
+		msg := log.Error("Unable to insert SSM request: %v", err)
+		http.Error(response, msg, http.StatusInternalServerError)
 	}
-
-	if len(resp) > 0 {
-		log.Error("SSM Response:", resp)
-	}
-
-	http.Error(response, err.Error(), http.StatusInternalServerError)
 }

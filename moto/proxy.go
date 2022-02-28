@@ -35,7 +35,7 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
-		msg := log.Error("Problem proxying to Moto: %v", err)
+		msg := log.Error("... unable to proxy to Moto: %v", err)
 		return proxyRequestBody.String(), "", errors.New(msg)
 	}
 
@@ -48,25 +48,6 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 
 	}
 
-	ctx := request.Context()
-	db := database.CreateConnection()
-	defer db.Close()
-
-	apiRequest := types.ApiRequest{
-		Service:       service,
-		Method:        request.Method,
-		Path:          request.URL.Path,
-		Authorization: authorization,
-		ContentType:   contentType,
-		Payload:       proxyRequestBody.String(),
-	}
-
-	err = queries.InsertRequest(ctx, db, &apiRequest)
-	if err != nil {
-		msg := log.Error("Unable to insert request for %s: %v", apiRequest.Service, err)
-		return proxyRequestBody.String(), apiRequest.Payload, errors.New(msg)
-	}
-
 	(*response).WriteHeader(resp.StatusCode)
 
 	var responseBody strings.Builder
@@ -74,7 +55,35 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 	io.Copy(*response, body)
 	resp.Body.Close()
 
-	return proxyRequestBody.String(), apiRequest.Payload, nil
+	return proxyRequestBody.String(), responseBody.String(), nil
+}
+
+func InsertRequest(service string, request *http.Request, payload string) error {
+	ctx := request.Context()
+	db := database.CreateConnection()
+	defer db.Close()
+
+	authorization := request.Header.Get("Authorization")
+	contentType := request.Header.Get("Content-Type")
+	target := request.Header.Get("X-Amz-Target")
+
+	apiRequest := types.ApiRequest{
+		Service:       service,
+		Method:        request.Method,
+		Path:          request.URL.Path,
+		Authorization: authorization,
+		Target:        target,
+		ContentType:   contentType,
+		Payload:       payload,
+	}
+
+	err := queries.InsertRequest(ctx, db, &apiRequest)
+	if err != nil {
+		msg := log.Error("Unable to insert request for %s: %v", apiRequest.Service, err)
+		return errors.New(msg)
+	}
+
+	return nil
 }
 
 func ReplayToMoto(request types.ApiRequest) error {
@@ -85,6 +94,9 @@ func ReplayToMoto(request types.ApiRequest) error {
 	proxyReq, _ := http.NewRequest(request.Method, url, strings.NewReader(request.Payload))
 	proxyReq.Header.Set("Content-Type", request.ContentType)
 	proxyReq.Header.Set("Authorization", request.Authorization)
+	if len(request.Target) > 0 {
+		proxyReq.Header.Set("X-Amz-Target", request.Target)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)

@@ -17,4 +17,9 @@ var Migrations = []database.Migration{
 				);
 		`,
 	},
+	{
+		Service:     "Moto",
+		Description: "Add Target Column",
+		Query:       `ALTER TABLE moto_request ADD COLUMN target text not null DEFAULT ''`,
+	},
 }

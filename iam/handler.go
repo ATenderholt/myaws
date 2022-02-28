@@ -7,18 +7,18 @@ import (
 )
 
 func Handler(response http.ResponseWriter, request *http.Request) {
-	req, resp, err := moto.ProxyToMoto(&response, request, "iam")
-	if err == nil {
+	in, out, err := moto.ProxyToMoto(&response, request, "iam")
+	log.Debug("IAM Request Payload: %s", in)
+	log.Debug("IAM Response Body: %s", out)
+
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if len(req) > 0 {
-		log.Error("IAM Request: ", req)
+	err = moto.InsertRequest("iam", request, in)
+	if err != nil {
+		msg := log.Error("Unable to insert IAM request: %v", err)
+		http.Error(response, msg, http.StatusInternalServerError)
 	}
-
-	if len(resp) > 0 {
-		log.Error("IAM Response:", resp)
-	}
-
-	http.Error(response, err.Error(), http.StatusInternalServerError)
 }

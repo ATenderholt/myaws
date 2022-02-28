@@ -7,5 +7,6 @@ type ApiRequest struct {
 	Path          string
 	Authorization string
 	ContentType   string
+	Target        string
 	Payload       string
 }

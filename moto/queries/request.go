@@ -16,13 +16,14 @@ func InsertRequest(ctx context.Context, db *database.Database, apiRequest *types
 
 	id, err := db.InsertOne(
 		ctx,
-		`INSERT INTO moto_request (service, method, path, authorization, content_type, payload)
-					VALUES (?, ?, ?, ?, ?, ?)
+		`INSERT INTO moto_request (service, method, path, authorization, target, content_type, payload)
+					VALUES (?, ?, ?, ?, ?, ?, ?)
 		`,
 		apiRequest.Service,
 		apiRequest.Method,
 		apiRequest.Path,
 		apiRequest.Authorization,
+		apiRequest.Target,
 		apiRequest.ContentType,
 		apiRequest.Payload,
 	)
@@ -49,7 +50,7 @@ func FindAllRequests(ctx context.Context, db *database.Database) (<-chan types.A
 
 		rows, err := db.QueryContext(
 			ctx,
-			`SELECT id, service, method, path, authorization, content_type, payload FROM moto_request ORDER BY id`,
+			`SELECT id, service, method, path, authorization, target, content_type, payload FROM moto_request ORDER BY id`,
 		)
 
 		if err != nil {
@@ -66,6 +67,7 @@ func FindAllRequests(ctx context.Context, db *database.Database) (<-chan types.A
 				&result.Method,
 				&result.Path,
 				&result.Authorization,
+				&result.Target,
 				&result.ContentType,
 				&result.Payload,
 			)

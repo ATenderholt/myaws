@@ -65,9 +65,10 @@ func (migration Migration) apply(db *Database) {
 	hash := fmt.Sprintf("%x", rawHash)
 
 	var dbHash string
+	var dbApplied bool
 	needsApplying := false
-	err := db.QueryRow("SELECT hash FROM migration WHERE service = ? and description = ?",
-		migration.Service, migration.Description).Scan(&dbHash)
+	err := db.QueryRow("SELECT hash, applied FROM migration WHERE service = ? and description = ?",
+		migration.Service, migration.Description).Scan(&dbHash, &dbApplied)
 
 	switch {
 	case err == sql.ErrNoRows:
@@ -77,12 +78,17 @@ func (migration Migration) apply(db *Database) {
 		log.Panic("... error when searching for Migration %v: %v.", migration, err)
 	}
 
+	if !needsApplying && !dbApplied {
+		msg := log.Error("... Migration %v was already attempted, but failed to apply.", migration)
+		panic(msg)
+	}
+
 	if !needsApplying && hash != dbHash {
 		log.Panic("Migration %v does not need to be applied by hashes are different: found %s != expected %s.",
 			migration, dbHash, hash)
 	}
 
-	if !needsApplying {
+	if !needsApplying && dbApplied {
 		log.Info("... Migration %v already applied.", migration)
 		return
 	}
@@ -102,5 +108,9 @@ func (migration Migration) apply(db *Database) {
 		migration.Service, migration.Description, hash, applied)
 	if err != nil {
 		log.Panic("Unable to save Migration %v.", migration)
+	}
+
+	if !applied {
+		panic("Migrations are not all applied.")
 	}
 }

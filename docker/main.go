@@ -34,8 +34,8 @@ func NewController() *Docker {
 	return &Docker{cli: cli, running: running}
 }
 
-func EnsureImage(image string) {
-	reader, err := instance.cli.ImagePull(context.Background(), image, types.ImagePullOptions{})
+func EnsureImage(ctx context.Context, image string) {
+	reader, err := instance.cli.ImagePull(ctx, image, types.ImagePullOptions{})
 	if err != nil {
 		msg := log.Error("Error when ensuring image %s exists: %v", image, err)
 		panic(msg)
@@ -55,7 +55,7 @@ func EnsureImage(image string) {
 	}
 }
 
-func Start(c Container) error {
+func Start(ctx context.Context, c Container) error {
 	portSet, portMap, err := c.PortBindings()
 	if err != nil {
 		msg := log.Error("Unable to get port bindings: %v", err)
@@ -74,7 +74,6 @@ func Start(c Container) error {
 		Env:          c.Environment,
 	}
 
-	ctx := context.Background()
 	resp, err := instance.cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, c.Name)
 	if err != nil {
 		msg := log.Error("Unable to create container %s: %v", c, err)
@@ -92,7 +91,8 @@ func Start(c Container) error {
 
 	go func() {
 		logOptions := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true}
-		reader, err := instance.cli.ContainerLogs(ctx, resp.ID, logOptions)
+		// logs need to be in backgroud context so they aren't canceled before container.
+		reader, err := instance.cli.ContainerLogs(context.Background(), resp.ID, logOptions)
 
 		if err != nil {
 			log.Error("Unable to follow logs for container %s: %v", c, err)
@@ -111,10 +111,9 @@ func Start(c Container) error {
 	return nil
 }
 
-func Shutdown(c Container) error {
+func Shutdown(ctx context.Context, c Container) error {
 	log.Info("Trying to shutdown %s...", c)
 
-	ctx := context.Background()
 	timeout := 30 * time.Second
 	err := instance.cli.ContainerStop(ctx, c.ID, &timeout)
 	if err != nil {
@@ -124,7 +123,7 @@ func Shutdown(c Container) error {
 
 	delete(instance.running, c.Name)
 
-	err = instance.cli.ContainerRemove(context.Background(), c.ID, types.ContainerRemoveOptions{})
+	err = instance.cli.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{})
 	if err != nil {
 		msg := log.Error("Unable to remove container %s: %v", c, err)
 		return errors.New(msg)
@@ -133,10 +132,10 @@ func Shutdown(c Container) error {
 	return nil
 }
 
-func ShutdownAll() error {
+func ShutdownAll(ctx context.Context) error {
 	var allErrors []string
 	for _, c := range instance.running {
-		err := Shutdown(c)
+		err := Shutdown(ctx, c)
 		if err != nil {
 			allErrors = append(allErrors, err.Error())
 		}

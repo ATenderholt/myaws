@@ -48,7 +48,7 @@ func start(ctx context.Context) error {
 
 	log.Info("Shutting down ...")
 
-	ctxShutDown, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer func() {
 		cancel()
 	}()
@@ -58,7 +58,7 @@ func start(ctx context.Context) error {
 		log.Error("Error when shutting down HTTP server")
 	}
 
-	err = docker.ShutdownAll()
+	err = docker.ShutdownAll(ctxShutDown)
 	if err != nil {
 		log.Error("Errors when shutting down docker containers: %v", err)
 	}
@@ -77,20 +77,20 @@ func initializeDb() {
 
 func initializeDocker(ctx context.Context) {
 	// start moto first so a few seconds pass before trying to replay its events - potentially fragile!
-	docker.EnsureImage(moto.Image)
-	err := docker.Start(moto.Container)
+	docker.EnsureImage(ctx, moto.Image)
+	err := docker.Start(ctx, moto.Container)
 	if err != nil {
 		panic(err)
 	}
 
-	docker.EnsureImage(s3.Image)
-	err = docker.Start(s3.Container)
+	docker.EnsureImage(ctx, s3.Image)
+	err = docker.Start(ctx, s3.Container)
 	if err != nil {
 		panic(err)
 	}
 
-	docker.EnsureImage(sqs.Image)
-	err = docker.Start(sqs.Container)
+	docker.EnsureImage(ctx, sqs.Image)
+	err = docker.Start(ctx, sqs.Container)
 	if err != nil {
 		panic(err)
 	}
@@ -100,7 +100,7 @@ func initializeDocker(ctx context.Context) {
 		panic(err)
 	}
 
-	docker.EnsureImage("mlupin/docker-lambda:python3.8")
+	docker.EnsureImage(ctx, "mlupin/docker-lambda:python3.8")
 
 	db := database.CreateConnection()
 	functions, err := queries.LatestFunctions(ctx, db)
@@ -109,7 +109,7 @@ func initializeDocker(ctx context.Context) {
 	}
 
 	for _, function := range functions {
-		err := lambda.StartFunction(&function)
+		err := lambda.StartFunction(ctx, &function)
 		if err != nil {
 			panic(err)
 		}

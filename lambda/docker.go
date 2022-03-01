@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"context"
 	"errors"
 	"github.com/docker/docker/api/types/mount"
 	"myaws/config"
@@ -48,7 +49,7 @@ func (pool PortPool) Get() (int, error) {
 	return result, nil
 }
 
-func StartFunction(function *types.Function) error {
+func StartFunction(ctx context.Context, function *types.Function) error {
 	port, err := pool.Get()
 	if err != nil {
 		msg := log.Error("Unable to start Function %s: %v", function.FunctionName, err)
@@ -84,7 +85,7 @@ func StartFunction(function *types.Function) error {
 		},
 	}
 
-	err = docker.Start(container)
+	err = docker.Start(ctx, container)
 	if err != nil {
 		msg := log.Error("Unable to start Function %s: %v", function.FunctionName, err)
 		return errors.New(msg)

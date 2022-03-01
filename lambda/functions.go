@@ -226,3 +226,10 @@ func GetFunctionCodeSigning(response http.ResponseWriter, request *http.Request)
 	result := lambda.GetFunctionCodeSigningConfigOutput{}
 	utils.RespondWithJson(response, result)
 }
+
+const InvokeFunctionRegex = `/2015-03-31/functions/[0-9A-Za-z_-]+/invocations`
+
+func InvokeFunction(response http.ResponseWriter, request *http.Request) {
+	name := getFunctionName(request.URL.Path)
+	manager.Invoke(name, &response, request)
+}

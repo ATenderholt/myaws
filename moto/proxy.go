@@ -14,6 +14,12 @@ import (
 	"strings"
 )
 
+const (
+	Authorization = "Authorization"
+	ContentType   = "ContentType"
+	AmzTarget     = "X-Amz-Target"
+)
+
 func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service string) (in string, out string, err error) {
 	log.Info("Proxying %s request to moto ...", service)
 
@@ -21,15 +27,15 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 
 	var proxyRequestBody strings.Builder
 	requestBody := io.TeeReader(request.Body, &proxyRequestBody)
-	authorization := request.Header.Get("Authorization")
-	contentType := request.Header.Get("Content-Type")
-	target := request.Header.Get("X-Amz-Target")
+	authorization := request.Header.Get(Authorization)
+	contentType := request.Header.Get(ContentType)
+	target := request.Header.Get(AmzTarget)
 
 	proxyReq, _ := http.NewRequest(request.Method, url, requestBody)
-	proxyReq.Header.Set("Content-Type", contentType)
-	proxyReq.Header.Set("Authorization", authorization)
+	proxyReq.Header.Set(ContentType, contentType)
+	proxyReq.Header.Set(Authorization, authorization)
 	if len(target) > 0 {
-		proxyReq.Header.Set("X-Amz-Target", target)
+		proxyReq.Header.Set(AmzTarget, target)
 	}
 
 	client := &http.Client{}
@@ -63,9 +69,9 @@ func InsertRequest(service string, request *http.Request, payload string) error 
 	db := database.CreateConnection()
 	defer db.Close()
 
-	authorization := request.Header.Get("Authorization")
-	contentType := request.Header.Get("Content-Type")
-	target := request.Header.Get("X-Amz-Target")
+	authorization := request.Header.Get(Authorization)
+	contentType := request.Header.Get(ContentType)
+	target := request.Header.Get(AmzTarget)
 
 	apiRequest := types.ApiRequest{
 		Service:       service,

@@ -115,7 +115,7 @@ func StartFunction(ctx context.Context, function *types.Function) error {
 		return errors.New(msg)
 	}
 
-	log.Info("Starting Function %s on port %d", function.FunctionName, port)
+	log.Info("Starting Function %s on port %d using handler %s", function.FunctionName, port, function.Handler)
 
 	container := docker.Container{
 		Name:    function.FunctionName,

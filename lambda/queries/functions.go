@@ -338,7 +338,7 @@ func LatestFunctions(ctx context.Context, db *database.Database) ([]types.Functi
 
 	rows, err := db.QueryContext(
 		ctx,
-		`SELECT name, max(version), runtime FROM lambda_function GROUP BY name`,
+		`SELECT name, max(version), runtime, handler FROM lambda_function GROUP BY name`,
 	)
 
 	var results []types.Function
@@ -359,6 +359,7 @@ func LatestFunctions(ctx context.Context, db *database.Database) ([]types.Functi
 			&function.FunctionName,
 			&function.Version,
 			&function.Runtime,
+			&function.Handler,
 		)
 
 		if err != nil {

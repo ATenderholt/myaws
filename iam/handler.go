@@ -9,25 +9,22 @@ import (
 
 var excludes = [...]string{"GetRole", "ListRolePolicies", "ListAttachedRolePolicies"}
 
+func shouldPersist(_ http.Header, payload string) bool {
+	for _, exclude := range excludes {
+		if strings.Contains(payload, exclude) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func Handler(response http.ResponseWriter, request *http.Request) {
-	in, out, err := moto.ProxyToMoto(&response, request, "iam")
+	in, out, err := moto.ProxyToMoto(&response, request, "iam", shouldPersist)
 	log.Debug("IAM Request Payload: %s", in)
 	log.Debug("IAM Response Body: %s", out)
 
 	if err != nil {
 		http.Error(response, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	for _, exclude := range excludes {
-		if strings.Contains(in, exclude) {
-			return
-		}
-	}
-
-	err = moto.InsertRequest("iam", request, in)
-	if err != nil {
-		msg := log.Error("Unable to insert IAM request: %v", err)
-		http.Error(response, msg, http.StatusInternalServerError)
 	}
 }

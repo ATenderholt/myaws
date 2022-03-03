@@ -16,17 +16,19 @@ import (
 
 const (
 	Authorization = "Authorization"
-	ContentType   = "ContentType"
+	ContentType   = "Content-Type"
 	AmzTarget     = "X-Amz-Target"
 )
 
-func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service string) (in string, out string, err error) {
+type ShouldPersist func(http.Header, string) bool
+
+func ProxyToMoto(writer *http.ResponseWriter, request *http.Request, service string, shouldPersist ShouldPersist) (in string, out string, err error) {
 	log.Info("Proxying %s request to moto ...", service)
 
 	url := fmt.Sprintf("http://%s:%d%s", config.Moto().Host, config.Moto().Port, request.URL.Path)
 
-	var proxyRequestBody strings.Builder
-	requestBody := io.TeeReader(request.Body, &proxyRequestBody)
+	var payloadBuilder strings.Builder
+	requestBody := io.TeeReader(request.Body, &payloadBuilder)
 	authorization := request.Header.Get(Authorization)
 	contentType := request.Header.Get(ContentType)
 	target := request.Header.Get(AmzTarget)
@@ -40,28 +42,38 @@ func ProxyToMoto(response *http.ResponseWriter, request *http.Request, service s
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)
+	payload := payloadBuilder.String()
 	if err != nil {
 		msg := log.Error("... unable to proxy to Moto: %v", err)
-		return proxyRequestBody.String(), "", errors.New(msg)
+		return payload, "", errors.New(msg)
 	}
 
 	log.Info("Got following response from Moto: %+v", resp)
 
 	for key, value := range resp.Header {
 		for _, v := range value {
-			(*response).Header().Add(key, v)
+			(*writer).Header().Add(key, v)
 		}
 
 	}
 
-	(*response).WriteHeader(resp.StatusCode)
+	if shouldPersist(request.Header, payload) {
+		err = InsertRequest(service, request, payload)
+		if err != nil {
+			msg := log.Error("Unable to insert %s request: %v", service, err)
+			responseBody, _ := io.ReadAll(resp.Body)
+			return payload, string(responseBody), errors.New(msg)
+		}
+	}
 
-	var responseBody strings.Builder
-	body := io.TeeReader(resp.Body, &responseBody)
-	io.Copy(*response, body)
+	(*writer).WriteHeader(resp.StatusCode)
+
+	var responseBuilder strings.Builder
+	responseBody := io.TeeReader(resp.Body, &responseBuilder)
+	io.Copy(*writer, responseBody)
 	resp.Body.Close()
 
-	return proxyRequestBody.String(), responseBody.String(), nil
+	return payload, responseBuilder.String(), nil
 }
 
 func InsertRequest(service string, request *http.Request, payload string) error {

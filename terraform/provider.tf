@@ -1,6 +1,4 @@
 provider "aws" {
-  # ... potentially other provider configuration ...
-
   region            = "us-west-2"
   s3_use_path_style = var.s3_use_path_style
 

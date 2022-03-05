@@ -8,7 +8,7 @@ import (
 	"myaws/sqs/types"
 )
 
-func Save(ctx context.Context, db *database.Database, queue *types.Queue) error {
+func SaveQueue(ctx context.Context, db *database.Database, queue *types.Queue) error {
 	tx, err := db.BeginTx(ctx)
 	if err != nil {
 		msg := log.Error("Unable to begin transaction to save %s: %v", queue.Name, err)
@@ -50,4 +50,54 @@ func Save(ctx context.Context, db *database.Database, queue *types.Queue) error 
 	}
 
 	return nil
+}
+
+func LoadQueue(ctx context.Context, db *database.Database, name string) (*types.Queue, error) {
+	queue := types.NewQueue(name)
+
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT key, value from sqs_queue_attribute WHERE name = ?`,
+		name,
+	)
+
+	if err != nil {
+		msg := log.Error("Unable to load attributes for queue %s: %v", name, err)
+		return nil, errors.New(msg)
+	}
+
+	for rows.Next() {
+		var key, value string
+		err := rows.Scan(&key, &value)
+		if err != nil {
+			msg := log.Error("Unable to scan attributes for queue %s: %v", name, err)
+			return nil, errors.New(msg)
+		}
+
+		queue.Attributes[key] = value
+	}
+
+	rows, err = db.QueryContext(
+		ctx,
+		`SELECT key, value from sqs_queue_tag WHERE name = ?`,
+		name,
+	)
+
+	if err != nil {
+		msg := log.Error("Unable to load tags for queue %s: %v", name, err)
+		return nil, errors.New(msg)
+	}
+
+	for rows.Next() {
+		var key, value string
+		err := rows.Scan(&key, &value)
+		if err != nil {
+			msg := log.Error("Unable to scan tag for queue %s: %v", name, err)
+			return nil, errors.New(msg)
+		}
+
+		queue.Tags[key] = value
+	}
+
+	return queue, nil
 }

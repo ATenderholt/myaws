@@ -70,6 +70,7 @@ func initializeDb() {
 	var migrations database.Migrations
 	migrations.AddAll(lambda.Migrations)
 	migrations.AddAll(moto.Migrations)
+	migrations.AddAll(sqs.Migrations)
 
 	log.Info("Initializing DB with %d Migrations.", migrations.Size())
 	database.Initialize(migrations)

@@ -1,8 +1,6 @@
 package sqs
 
 import (
-	"bytes"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -57,43 +55,49 @@ func proxyToElasticMQ(response *http.ResponseWriter, request *http.Request, regi
 
 	log.Info("Got following response from ElasticMQ: %+v", resp)
 
-	for key, value := range resp.Header {
-		for _, v := range value {
-			(*response).Header().Add(key, v)
-		}
-	}
+	//for key, value := range resp.Header {
+	//	for _, v := range value {
+	//		(*response).Header().Add(key, v)
+	//	}
+	//}
 
 	// have to peek inside request since ElasticMQ doesn't seem to support /persist same properties that Terraform expects
 	// and do different things
 	payload := payloadBuilder.String()
-	if strings.Contains(payload, "GetQueueAttributes") {
-		log.Info("Handling %s", payload)
-		parser := xml.NewDecoder(resp.Body)
-		var output GetQueueAttributesResponse
-		err := parser.Decode(&output)
-		if err != nil {
-			msg := log.Error("Unable to unmarshall %s: %v", payload, err)
-			return payload, "", errors.New(msg)
+	for action, f := range actions {
+		if strings.Contains(payload, action) {
+			return f(request.Context(), response, resp, payload)
 		}
-
-		log.Info("Got following response object: %+v", output)
-		attributes := output.GetQueueAttributesResult.Attribute
-		attributes = append(attributes, QueueAttribute{Name: "MaximumMessageSize", Value: "262144"})
-		attributes = append(attributes, QueueAttribute{Name: "MessageRetentionPeriod", Value: "345600"})
-		output.GetQueueAttributesResult.Attribute = attributes
-
-		(*response).WriteHeader(resp.StatusCode)
-		b, err := xml.Marshal(output)
-		if err != nil {
-			msg := log.Error("Unable to marshall %v: %v", output, err)
-			return payload, "", errors.New(msg)
-		}
-		io.Copy(*response, bytes.NewReader(b))
-		resp.Body.Close()
-
-		return payload, "", nil
-
 	}
+
+	//if strings.Contains(payload, "GetQueueAttributes") {
+	//	log.Info("Handling %s", payload)
+	//	parser := xml.NewDecoder(resp.Body)
+	//	var output GetQueueAttributesResponse
+	//	err := parser.Decode(&output)
+	//	if err != nil {
+	//		msg := log.Error("Unable to unmarshall %s: %v", payload, err)
+	//		return payload, "", errors.New(msg)
+	//	}
+	//
+	//	log.Info("Got following response object: %+v", output)
+	//	attributes := output.GetQueueAttributesResult.Attribute
+	//	attributes = append(attributes, QueueAttribute{Name: "MaximumMessageSize", Value: "262144"})
+	//	attributes = append(attributes, QueueAttribute{Name: "MessageRetentionPeriod", Value: "345600"})
+	//	output.GetQueueAttributesResult.Attribute = attributes
+	//
+	//	(*response).WriteHeader(resp.StatusCode)
+	//	b, err := xml.Marshal(output)
+	//	if err != nil {
+	//		msg := log.Error("Unable to marshall %v: %v", output, err)
+	//		return payload, "", errors.New(msg)
+	//	}
+	//	io.Copy(*response, bytes.NewReader(b))
+	//	resp.Body.Close()
+	//
+	//	return payload, string(b), nil
+	//
+	//}
 
 	var responseBuilder strings.Builder
 	responseBody := io.TeeReader(resp.Body, &responseBuilder)

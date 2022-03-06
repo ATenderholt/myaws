@@ -86,7 +86,7 @@ func GetEventSource(writer http.ResponseWriter, request *http.Request) {
 		http.NotFound(writer, request)
 		return
 	}
-	
+
 	body := eventSource.ToGetEventSourceMappingOutput()
 
 	utils.RespondWithJson(writer, body)

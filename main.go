@@ -115,4 +115,16 @@ func initializeDocker(ctx context.Context) {
 			panic(err)
 		}
 	}
+
+	eventSource, err := queries.LoadEventSource(ctx, db, "0486b330-6eed-48eb-87ac-742ab978db18")
+	if err != nil {
+		panic(err)
+	}
+
+	time.Sleep(10 * time.Second)
+
+	err = lambda.StartEventSource(ctx, eventSource)
+	if err != nil {
+		panic(err)
+	}
 }

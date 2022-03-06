@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/docker/distribution/uuid"
 	"github.com/docker/docker/api/types/mount"
 	"io"
 	"myaws/config"
@@ -11,6 +14,7 @@ import (
 	"myaws/lambda/types"
 	"myaws/log"
 	"net/http"
+	"strings"
 )
 
 var manager *ManagerImpl
@@ -18,10 +22,12 @@ var manager *ManagerImpl
 type Manager interface {
 	Add(name string, port int)
 	Invoke(response http.ResponseWriter, request *http.Request)
+	StartEventSource(ctx context.Context, eventSource *types.EventSource)
 }
 
 type ManagerImpl struct {
-	ports map[string]int
+	ports        map[string]int
+	eventSources map[uuid.UUID]context.CancelFunc
 }
 
 func (manager *ManagerImpl) Add(name string, port int) {
@@ -67,6 +73,96 @@ func (manager *ManagerImpl) Invoke(name string, response *http.ResponseWriter, r
 
 	io.Copy(*response, resp.Body)
 	resp.Body.Close()
+}
+
+var credentials aws.CredentialsProviderFunc = func(ctx context.Context) (aws.Credentials, error) {
+	return aws.Credentials{AccessKeyID: "", SecretAccessKey: "", CanExpire: false}, nil
+}
+
+var endpointResolver aws.EndpointResolverWithOptionsFunc = func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+	return aws.Endpoint{
+		URL:               "http://localhost:9324",
+		HostnameImmutable: true,
+	}, nil
+}
+
+func StartEventSource(ctx context.Context, eventSource *types.EventSource) error {
+	return manager.StartEventSource(ctx, eventSource)
+}
+
+func (manager *ManagerImpl) StartEventSource(ctx context.Context, eventSource *types.EventSource) error {
+	parts := strings.Split(eventSource.Arn, ":")
+	queueName := parts[5]
+
+	log.Info("Starting consumption from Queue %s ...", queueName)
+
+	runCtx, cancel := context.WithCancel(ctx)
+	cfg := aws.Config{
+		Region:                      "us-west-2",
+		Credentials:                 credentials,
+		HTTPClient:                  nil,
+		EndpointResolver:            nil,
+		EndpointResolverWithOptions: endpointResolver,
+		RetryMaxAttempts:            0,
+		RetryMode:                   "",
+		Retryer:                     nil,
+		ConfigSources:               nil,
+		APIOptions:                  nil,
+		Logger:                      nil,
+		ClientLogMode:               0,
+		DefaultsMode:                "",
+		RuntimeEnvironment:          aws.RuntimeEnvironment{},
+	}
+
+	client := sqs.NewFromConfig(cfg)
+
+	listQueuesOutput, err := client.ListQueues(ctx, &sqs.ListQueuesInput{QueueNamePrefix: &queueName})
+	if err != nil {
+		msg := log.Error("Unable to list queues for %s: %v", queueName, err)
+		return errors.New(msg)
+	}
+
+	if len(listQueuesOutput.QueueUrls) != 1 {
+		msg := log.Error("Found %d queue urls for %s: %v", len(listQueuesOutput.QueueUrls), queueName, listQueuesOutput.QueueUrls)
+		return errors.New(msg)
+	}
+
+	queueUrl := listQueuesOutput.QueueUrls[0]
+	receiveMessageInput := sqs.ReceiveMessageInput{
+		QueueUrl:                &queueUrl,
+		AttributeNames:          nil,
+		MaxNumberOfMessages:     eventSource.BatchSize,
+		MessageAttributeNames:   nil,
+		ReceiveRequestAttemptId: nil,
+		VisibilityTimeout:       0,
+		WaitTimeSeconds:         5,
+	}
+
+	go func() {
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			default:
+				receiveMessageOutput, err := client.ReceiveMessage(ctx, &receiveMessageInput)
+				if err != nil {
+					log.Error("Error: %v", err)
+					continue
+				}
+
+				if len(receiveMessageOutput.Messages) == 0 {
+					log.Info("No messages")
+				}
+				for _, message := range receiveMessageOutput.Messages {
+					log.Info("Received %+v", message)
+				}
+			}
+		}
+	}()
+
+	manager.eventSources[eventSource.UUID] = cancel
+
+	return nil
 }
 
 type PortPool struct {
@@ -152,7 +248,7 @@ func StartFunction(ctx context.Context, function *types.Function) error {
 	}
 
 	if manager == nil {
-		manager = &ManagerImpl{ports: make(map[string]int)}
+		manager = &ManagerImpl{ports: make(map[string]int), eventSources: make(map[uuid.UUID]context.CancelFunc)}
 	}
 
 	manager.Add(function.FunctionName, port)

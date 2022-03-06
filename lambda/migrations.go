@@ -94,4 +94,21 @@ var Migrations = []database.Migration{
 		Description: "Unique constraint on Function environment",
 		Query:       `CREATE UNIQUE INDEX uk_environment ON lambda_function_environment(function_id, key)`,
 	},
+	{
+		Service:     "Lambda",
+		Description: "Create Event Source Table",
+		Query: `CREATE TABLE IF NOT EXISTS lambda_event_source (
+					id		          integer primary key autoincrement,
+					uuid              text not null,
+				    enabled           integer not null,
+					arn               text not null,
+					function_id       integer not null,
+					batch_size        integer not null,
+					last_modified_on  integer not null,
+					FOREIGN KEY(function_id) REFERENCES lambda_function(id)
+				);
+
+				CREATE UNIQUE INDEX uk_lambda_event_source on lambda_event_source(arn, function_id);
+		`,
+	},
 }

@@ -47,3 +47,35 @@ func (eventSource EventSource) ToCreateEventSourceMappingOutput() lambda.CreateE
 		UUID:                           &id,
 	}
 }
+
+func (eventSource EventSource) ToGetEventSourceMappingOutput() lambda.GetEventSourceMappingOutput {
+	id := eventSource.UUID.String()
+	lastModified := time.UnixMilli(eventSource.LastModified)
+	state := "Enabled"
+
+	return lambda.GetEventSourceMappingOutput{
+		BatchSize:                      &eventSource.BatchSize,
+		BisectBatchOnFunctionError:     nil,
+		DestinationConfig:              nil,
+		EventSourceArn:                 &eventSource.Arn,
+		FilterCriteria:                 nil,
+		FunctionArn:                    eventSource.Function.GetArn(),
+		FunctionResponseTypes:          nil,
+		LastModified:                   &lastModified,
+		LastProcessingResult:           nil,
+		MaximumBatchingWindowInSeconds: nil,
+		MaximumRecordAgeInSeconds:      nil,
+		MaximumRetryAttempts:           nil,
+		ParallelizationFactor:          nil,
+		Queues:                         nil,
+		SelfManagedEventSource:         nil,
+		SourceAccessConfigurations:     nil,
+		StartingPosition:               "",
+		StartingPositionTimestamp:      nil,
+		State:                          &state,
+		StateTransitionReason:          nil,
+		Topics:                         nil,
+		TumblingWindowInSeconds:        nil,
+		UUID:                           &id,
+	}
+}

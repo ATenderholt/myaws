@@ -25,7 +25,7 @@ func PostEventSource(writer http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(reader)
 	err := decoder.Decode(&payload)
 	if err != nil {
-		msg := log.Error("unable to decode body for creating an event source: %v", err)
+		msg := log.Error("unable to decode body for creating an Event Source: %v", err)
 		http.Error(writer, msg, http.StatusInternalServerError)
 		return
 	}
@@ -35,7 +35,7 @@ func PostEventSource(writer http.ResponseWriter, request *http.Request) {
 
 	function, err := queries.LatestFunctionByName(ctx, db, *payload.FunctionName)
 	if err != nil {
-		msg := log.Error("error when loading function %s: %v", payload.FunctionName, err)
+		msg := log.Error("unable to load Function %s: %v", payload.FunctionName, err)
 		http.Error(writer, msg, http.StatusInternalServerError)
 		return
 	}
@@ -49,16 +49,45 @@ func PostEventSource(writer http.ResponseWriter, request *http.Request) {
 		LastModified: time.Now().UnixMilli(),
 	}
 
-	log.Info("Saving event source: %+v", eventSource)
+	log.Info("Saving Event Source: %+v", eventSource)
 
 	err = queries.SaveEventSource(ctx, db, eventSource)
 	if err != nil {
-		msg := log.Error("unable to save event source %+v: %v", eventSource, err)
+		msg := log.Error("unable to save Event Source %+v: %v", eventSource, err)
 		http.Error(writer, msg, http.StatusInternalServerError)
 		return
 	}
 
 	body := eventSource.ToCreateEventSourceMappingOutput()
+
+	utils.RespondWithJson(writer, body)
+}
+
+const GetEventSourceRegex = `^/2015-03-31/event-source-mappings/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`
+
+func GetEventSource(writer http.ResponseWriter, request *http.Request) {
+	parts := strings.Split(request.URL.Path, "/")
+	id := parts[3]
+
+	log.Info("Getting event source %s ... ", id)
+
+	ctx := request.Context()
+	db := database.CreateConnection()
+
+	eventSource, err := queries.LoadEventSource(ctx, db, id)
+	if err != nil {
+		msg := log.Error("Unable to load Event Source %+v: %v", eventSource, err)
+		http.Error(writer, msg, http.StatusInternalServerError)
+		return
+	}
+
+	if eventSource == nil {
+		log.Info("Event Source %s not found", id)
+		http.NotFound(writer, request)
+		return
+	}
+	
+	body := eventSource.ToGetEventSourceMappingOutput()
 
 	utils.RespondWithJson(writer, body)
 }

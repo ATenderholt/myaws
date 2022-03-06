@@ -148,13 +148,19 @@ func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 		}
 	}
 
+	var environment *aws.EnvironmentResponse
+	if len(f.Environment.Variables) == 0 {
+		environment = nil
+	} else {
+		environment = &aws.EnvironmentResponse{Variables: f.Environment.Variables}
+	}
 	return &aws.FunctionConfiguration{
 		Architectures:              nil,
 		CodeSha256:                 &f.CodeSha256,
 		CodeSize:                   f.CodeSize,
 		DeadLetterConfig:           nil,
 		Description:                &f.Description,
-		Environment:                &aws.EnvironmentResponse{Variables: f.Environment.Variables},
+		Environment:                environment,
 		FileSystemConfigs:          nil,
 		FunctionArn:                f.GetArn(),
 		FunctionName:               &f.FunctionName,

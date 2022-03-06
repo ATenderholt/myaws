@@ -55,11 +55,11 @@ func EnsureImage(ctx context.Context, image string) {
 	}
 }
 
-func Start(ctx context.Context, c Container) error {
+func Start(ctx context.Context, c Container, ready string) (chan bool, error) {
 	portSet, portMap, err := c.PortBindings()
 	if err != nil {
 		msg := log.Error("Unable to get port bindings: %v", err)
-		return errors.New(msg)
+		return nil, errors.New(msg)
 	}
 
 	hostConfig := container.HostConfig{}
@@ -77,18 +77,19 @@ func Start(ctx context.Context, c Container) error {
 	resp, err := instance.cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, c.Name)
 	if err != nil {
 		msg := log.Error("Unable to create container %s: %v", c, err)
-		return errors.New(msg)
+		return nil, errors.New(msg)
 	}
 
 	err = instance.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
 	if err != nil {
 		msg := log.Error("Unable to start container %s: %v", c, err)
-		return errors.New(msg)
+		return nil, errors.New(msg)
 	}
 
 	c.ID = resp.ID
 	instance.running[c.Name] = c
 
+	readyChan := make(chan bool)
 	go func() {
 		logOptions := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true}
 		// logs need to be in backgroud context so they aren't canceled before container.
@@ -102,13 +103,18 @@ func Start(ctx context.Context, c Container) error {
 
 		lines := utils.ReadLinesAsBytes(reader)
 		for line := range lines {
-			log.Info("[DOCKER %s] %s", c.Name, string(line))
+			text := string(line)
+			log.Info("[DOCKER %s] %s", c.Name, text)
+			if len(ready) > 0 && strings.Contains(text, ready) {
+				readyChan <- true
+				close(readyChan)
+			}
 		}
 
 		log.Info("[DOCKER] Logs finished for container %s", c)
 	}()
 
-	return nil
+	return readyChan, nil
 }
 
 func Shutdown(ctx context.Context, c Container) error {

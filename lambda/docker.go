@@ -241,7 +241,7 @@ func StartFunction(ctx context.Context, function *types.Function) error {
 		},
 	}
 
-	err = docker.Start(ctx, container)
+	_, err = docker.Start(ctx, container, "")
 	if err != nil {
 		msg := log.Error("Unable to start Function %s: %v", function.FunctionName, err)
 		return errors.New(msg)

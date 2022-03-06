@@ -77,33 +77,19 @@ func initializeDb() {
 }
 
 func initializeDocker(ctx context.Context) {
-	// start moto first so a few seconds pass before trying to replay its events - potentially fragile!
-	docker.EnsureImage(ctx, moto.Image)
-	err := docker.Start(ctx, moto.Container)
-	if err != nil {
-		panic(err)
-	}
+	db := database.CreateConnection()
+
+	go initializeMoto(ctx)
+	go initializeElasticMQ(ctx, db)
 
 	docker.EnsureImage(ctx, s3.Image)
-	err = docker.Start(ctx, s3.Container)
-	if err != nil {
-		panic(err)
-	}
-
-	docker.EnsureImage(ctx, sqs.Image)
-	err = docker.Start(ctx, sqs.Container)
-	if err != nil {
-		panic(err)
-	}
-
-	err = moto.ReplayAllToMoto(ctx)
+	_, err := docker.Start(ctx, s3.Container, "")
 	if err != nil {
 		panic(err)
 	}
 
 	docker.EnsureImage(ctx, "mlupin/docker-lambda:python3.8")
 
-	db := database.CreateConnection()
 	functions, err := queries.LatestFunctions(ctx, db)
 	if err != nil {
 		panic(err)
@@ -116,12 +102,40 @@ func initializeDocker(ctx context.Context) {
 		}
 	}
 
-	eventSource, err := queries.LoadEventSource(ctx, db, "0486b330-6eed-48eb-87ac-742ab978db18")
+}
+
+func initializeMoto(ctx context.Context) {
+	docker.EnsureImage(ctx, moto.Image)
+	motoReady, err := docker.Start(ctx, moto.Container, "Running on http")
 	if err != nil {
 		panic(err)
 	}
 
-	time.Sleep(10 * time.Second)
+	<-motoReady
+
+	log.Info("Moto is ready, starting replay ...")
+
+	err = moto.ReplayAllToMoto(ctx)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initializeElasticMQ(ctx context.Context, db *database.Database) {
+	docker.EnsureImage(ctx, sqs.Image)
+	elasticReady, err := docker.Start(ctx, sqs.Container, "started in")
+	if err != nil {
+		panic(err)
+	}
+
+	<-elasticReady
+
+	log.Info("ElasticMQ is ready, starting event sources ...")
+
+	eventSource, err := queries.LoadEventSource(ctx, db, "0486b330-6eed-48eb-87ac-742ab978db18")
+	if err != nil {
+		panic(err)
+	}
 
 	err = lambda.StartEventSource(ctx, eventSource)
 	if err != nil {

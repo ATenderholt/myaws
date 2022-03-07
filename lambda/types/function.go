@@ -1,10 +1,12 @@
 package types
 
 import (
+	"context"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	aws "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/smithy-go/middleware"
 	"myaws/config"
+	"myaws/settings"
 	"myaws/utils"
 	"path/filepath"
 	"time"
@@ -93,7 +95,7 @@ func CreateFunction(input *lambda.CreateFunctionInput) *Function {
 	}
 }
 
-func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
+func (f Function) ToCreateFunctionOutput(ctx context.Context) *lambda.CreateFunctionOutput {
 	lastModified := time.UnixMilli(f.LastModified).Format(timeFormat)
 
 	return &lambda.CreateFunctionOutput{
@@ -116,7 +118,7 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 		LastUpdateStatus:           "",
 		LastUpdateStatusReason:     nil,
 		LastUpdateStatusReasonCode: "",
-		Layers:                     layersToAws(f.Layers),
+		Layers:                     layersToAws(f.Layers, ctx),
 		MasterArn:                  nil,
 		MemorySize:                 &f.MemorySize,
 		PackageType:                "Zip",
@@ -136,12 +138,12 @@ func (f Function) ToCreateFunctionOutput() *lambda.CreateFunctionOutput {
 	}
 }
 
-func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
+func (f *Function) ToFunctionConfiguration(ctx context.Context) *aws.FunctionConfiguration {
 	lastModified := timeMillisToString(f.LastModified)
 	layers := make([]aws.Layer, len(f.Layers))
 	for i, layer := range f.Layers {
 		layers[i] = aws.Layer{
-			Arn:                      layer.GetVersionArn(),
+			Arn:                      layer.GetVersionArn(ctx),
 			CodeSize:                 layer.CodeSize,
 			SigningJobArn:            nil,
 			SigningProfileVersionArn: nil,
@@ -162,7 +164,7 @@ func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 		Description:                &f.Description,
 		Environment:                environment,
 		FileSystemConfigs:          nil,
-		FunctionArn:                f.GetArn(),
+		FunctionArn:                f.GetArn(ctx),
 		FunctionName:               &f.FunctionName,
 		Handler:                    &f.Handler,
 		ImageConfigResponse:        nil,
@@ -190,8 +192,8 @@ func (f *Function) ToFunctionConfiguration() *aws.FunctionConfiguration {
 	}
 }
 
-func (f *Function) ToGetFunctionOutput() *lambda.GetFunctionOutput {
-	config := f.ToFunctionConfiguration()
+func (f *Function) ToGetFunctionOutput(ctx context.Context) *lambda.GetFunctionOutput {
+	config := f.ToFunctionConfiguration(ctx)
 	code := aws.FunctionCodeLocation{}
 	one := int32(-1)
 	concurrency := aws.Concurrency{ReservedConcurrentExecutions: &one}
@@ -204,12 +206,12 @@ func (f *Function) ToGetFunctionOutput() *lambda.GetFunctionOutput {
 	}
 }
 
-func (f *Function) ToUpdateFunctionConfigurationOutput() *lambda.UpdateFunctionConfigurationOutput {
+func (f *Function) ToUpdateFunctionConfigurationOutput(ctx context.Context) *lambda.UpdateFunctionConfigurationOutput {
 	lastModified := timeMillisToString(f.LastModified)
 	layers := make([]aws.Layer, len(f.Layers))
 	for i, layer := range f.Layers {
 		layers[i] = aws.Layer{
-			Arn:                      layer.GetVersionArn(),
+			Arn:                      layer.GetVersionArn(ctx),
 			CodeSize:                 layer.CodeSize,
 			SigningJobArn:            nil,
 			SigningProfileVersionArn: nil,
@@ -224,7 +226,7 @@ func (f *Function) ToUpdateFunctionConfigurationOutput() *lambda.UpdateFunctionC
 		Description:                &f.Description,
 		Environment:                &aws.EnvironmentResponse{Variables: f.Environment.Variables},
 		FileSystemConfigs:          nil,
-		FunctionArn:                f.GetArn(),
+		FunctionArn:                f.GetArn(ctx),
 		FunctionName:               &f.FunctionName,
 		Handler:                    &f.Handler,
 		ImageConfigResponse:        nil,
@@ -252,11 +254,11 @@ func (f *Function) ToUpdateFunctionConfigurationOutput() *lambda.UpdateFunctionC
 	}
 }
 
-func layersToAws(layers []LambdaLayer) []aws.Layer {
+func layersToAws(layers []LambdaLayer, ctx context.Context) []aws.Layer {
 	results := make([]aws.Layer, len(layers))
 	for i, layer := range layers {
 		results[i] = aws.Layer{
-			Arn:      layer.GetVersionArn(),
+			Arn:      layer.GetVersionArn(ctx),
 			CodeSize: layer.CodeSize,
 		}
 	}
@@ -274,7 +276,14 @@ func (f *Function) GetLayerDestPath() string {
 		f.Version, "layers")
 }
 
-func (f *Function) GetArn() *string {
-	result := "arn:aws:lambda:" + config.GetArnFragment() + ":function:" + f.FunctionName
+func (f *Function) GetArn(ctx context.Context) *string {
+	cfg, ok := settings.FromContext(ctx)
+	var result string
+	if ok {
+		result = "arn:aws:lambda:" + cfg.Region + ":" + cfg.AccountNumber + ":function:" + f.FunctionName
+	} else {
+		result = "arn:aws:lambda:" + settings.DefaultRegion + ":" + settings.DefaultAccountNumber + ":function:" + f.FunctionName
+	}
+
 	return &result
 }

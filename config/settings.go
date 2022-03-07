@@ -59,10 +59,6 @@ func GetDataPath() string {
 	return filepath.Join(cwd, instance.dataPath)
 }
 
-func GetArnFragment() string {
-	return instance.region + ":" + instance.accountNumber
-}
-
 func IsDebug() bool {
 	return instance.debug
 }

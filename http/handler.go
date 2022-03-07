@@ -3,6 +3,7 @@ package http
 import (
 	"io"
 	"myaws/log"
+	"myaws/settings"
 	"net/http"
 	"regexp"
 )
@@ -26,6 +27,7 @@ type route struct {
 }
 
 type RegexHandler struct {
+	config        *settings.Config
 	regexRoutes   []*route
 	serviceRoutes []*route
 }
@@ -53,6 +55,9 @@ func (h *RegexHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for key, value := range r.Header {
 		log.Info("   %s : %s", key, value)
 	}
+
+	ctx := h.config.NewContext(r.Context())
+	r = r.Clone(ctx)
 
 	// Handle regex based Routes first
 	for _, route := range h.regexRoutes {

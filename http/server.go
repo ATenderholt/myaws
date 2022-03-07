@@ -6,15 +6,16 @@ import (
 	"myaws/lambda"
 	"myaws/log"
 	"myaws/s3"
+	"myaws/settings"
 	"myaws/sqs"
 	"myaws/ssm"
 	"net/http"
 )
 
-func Serve() (srv *http.Server, err error) {
+func Serve(config *settings.Config) (srv *http.Server, err error) {
 	mux := http.NewServeMux()
 
-	handler := RegexHandler{}
+	handler := RegexHandler{config: config}
 
 	handler.HandleAuthHeader("iam", http.MethodPost, iam.Handler)
 

@@ -58,7 +58,7 @@ func PostEventSource(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	body := eventSource.ToCreateEventSourceMappingOutput()
+	body := eventSource.ToCreateEventSourceMappingOutput(ctx)
 
 	utils.RespondWithJson(writer, body)
 }
@@ -87,7 +87,7 @@ func GetEventSource(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	body := eventSource.ToGetEventSourceMappingOutput()
+	body := eventSource.ToGetEventSourceMappingOutput(ctx)
 
 	utils.RespondWithJson(writer, body)
 }

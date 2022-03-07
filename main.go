@@ -10,6 +10,7 @@ import (
 	"myaws/log"
 	"myaws/moto"
 	"myaws/s3"
+	"myaws/settings"
 	"myaws/sqs"
 	"os"
 	"os/signal"
@@ -29,17 +30,18 @@ func main() {
 		cancel()
 	}()
 
-	if err := start(ctx); err != nil {
+	cfg := settings.DefaultConfig()
+	if err := start(ctx, cfg); err != nil {
 		log.Error("Failed to start: %v", err)
 	}
 }
 
-func start(ctx context.Context) error {
+func start(ctx context.Context, config *settings.Config) error {
 	log.Info("Starting up ...")
 
 	initializeDb()
 	initializeDocker(ctx)
-	server, err := http.Serve()
+	server, err := http.Serve(config)
 	if err != nil {
 		panic(err)
 	}

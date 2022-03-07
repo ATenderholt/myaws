@@ -1,9 +1,11 @@
 package types
 
 import (
+	"context"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"myaws/config"
+	"myaws/settings"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -25,13 +27,20 @@ func (layer LambdaLayer) GetDestPath() string {
 		strconv.Itoa(layer.Version)+".zip")
 }
 
-func (layer LambdaLayer) GetArn() *string {
-	result := "arn:aws:lambda:" + config.GetArnFragment() + ":layer:" + layer.Name
+func (layer LambdaLayer) GetArn(ctx context.Context) *string {
+	cfg, ok := settings.FromContext(ctx)
+	var result string
+	if ok {
+		result = "arn:aws:lambda:" + cfg.Region + ":" + cfg.AccountNumber + ":layer:" + layer.Name
+	} else {
+		result = "arn:aws:lambda:" + settings.DefaultRegion + ":" + settings.DefaultAccountNumber + ":layer:" + layer.Name
+	}
+
 	return &result
 }
 
-func (layer LambdaLayer) GetVersionArn() *string {
-	arn := layer.GetArn()
+func (layer LambdaLayer) GetVersionArn(ctx context.Context) *string {
+	arn := layer.GetArn(ctx)
 	result := *arn + ":" + strconv.Itoa(layer.Version)
 	return &result
 }
@@ -50,7 +59,7 @@ func LayerFromArn(arn string) LambdaLayer {
 	}
 }
 
-func (layer LambdaLayer) ToPublishLayerVersionOutput() *lambda.PublishLayerVersionOutput {
+func (layer LambdaLayer) ToPublishLayerVersionOutput(ctx context.Context) *lambda.PublishLayerVersionOutput {
 	return &lambda.PublishLayerVersionOutput{
 		CompatibleArchitectures: []types.Architecture{},
 		CompatibleRuntimes:      layer.CompatibleRuntimes,
@@ -60,20 +69,20 @@ func (layer LambdaLayer) ToPublishLayerVersionOutput() *lambda.PublishLayerVersi
 		},
 		CreatedDate:     &layer.CreatedOn,
 		Description:     &layer.Description,
-		LayerArn:        layer.GetArn(),
-		LayerVersionArn: layer.GetVersionArn(),
+		LayerArn:        layer.GetArn(ctx),
+		LayerVersionArn: layer.GetVersionArn(ctx),
 		LicenseInfo:     nil,
 		Version:         int64(layer.Version),
 	}
 }
 
-func (layer LambdaLayer) ToLayerVersionsListItem() types.LayerVersionsListItem {
+func (layer LambdaLayer) ToLayerVersionsListItem(ctx context.Context) types.LayerVersionsListItem {
 	return types.LayerVersionsListItem{
 		CompatibleArchitectures: []types.Architecture{},
 		CompatibleRuntimes:      layer.CompatibleRuntimes,
 		CreatedDate:             &layer.CreatedOn,
 		Description:             &layer.Description,
-		LayerVersionArn:         layer.GetVersionArn(),
+		LayerVersionArn:         layer.GetVersionArn(ctx),
 		LicenseInfo:             nil,
 		Version:                 int64(layer.Version),
 	}

@@ -96,7 +96,7 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 	}
 
 	saved, err := queries.InsertFunction(ctx, db, function)
-	result := saved.ToCreateFunctionOutput()
+	result := saved.ToCreateFunctionOutput(ctx)
 
 	utils.RespondWithJson(response, result)
 }
@@ -152,7 +152,7 @@ func PutLambdaConfiguration(response http.ResponseWriter, request *http.Request)
 		}
 	}
 
-	result := function.ToUpdateFunctionConfigurationOutput()
+	result := function.ToUpdateFunctionConfigurationOutput(ctx)
 	utils.RespondWithJson(response, result)
 }
 
@@ -182,7 +182,7 @@ func GetLambdaFunction(response http.ResponseWriter, request *http.Request) {
 	}
 
 	function.Layers = layers
-	result := function.ToGetFunctionOutput()
+	result := function.ToGetFunctionOutput(ctx)
 
 	utils.RespondWithJson(response, result)
 }
@@ -208,7 +208,7 @@ func GetFunctionVersions(response http.ResponseWriter, request *http.Request) {
 
 	configs := make([]aws.FunctionConfiguration, len(functions))
 	for i, function := range functions {
-		configs[i] = *function.ToFunctionConfiguration()
+		configs[i] = *function.ToFunctionConfiguration(ctx)
 	}
 
 	results := lambda.ListVersionsByFunctionOutput{

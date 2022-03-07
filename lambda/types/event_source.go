@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/docker/distribution/uuid"
 	"time"
@@ -16,7 +17,7 @@ type EventSource struct {
 	LastModified int64
 }
 
-func (eventSource EventSource) ToCreateEventSourceMappingOutput() lambda.CreateEventSourceMappingOutput {
+func (eventSource EventSource) ToCreateEventSourceMappingOutput(ctx context.Context) lambda.CreateEventSourceMappingOutput {
 	id := eventSource.UUID.String()
 	lastModified := time.UnixMilli(eventSource.LastModified)
 	state := "Enabled"
@@ -27,7 +28,7 @@ func (eventSource EventSource) ToCreateEventSourceMappingOutput() lambda.CreateE
 		DestinationConfig:              nil,
 		EventSourceArn:                 &eventSource.Arn,
 		FilterCriteria:                 nil,
-		FunctionArn:                    eventSource.Function.GetArn(),
+		FunctionArn:                    eventSource.Function.GetArn(ctx),
 		FunctionResponseTypes:          nil,
 		LastModified:                   &lastModified,
 		LastProcessingResult:           nil,
@@ -48,7 +49,7 @@ func (eventSource EventSource) ToCreateEventSourceMappingOutput() lambda.CreateE
 	}
 }
 
-func (eventSource EventSource) ToGetEventSourceMappingOutput() lambda.GetEventSourceMappingOutput {
+func (eventSource EventSource) ToGetEventSourceMappingOutput(ctx context.Context) lambda.GetEventSourceMappingOutput {
 	id := eventSource.UUID.String()
 	lastModified := time.UnixMilli(eventSource.LastModified)
 	state := "Enabled"
@@ -59,7 +60,7 @@ func (eventSource EventSource) ToGetEventSourceMappingOutput() lambda.GetEventSo
 		DestinationConfig:              nil,
 		EventSourceArn:                 &eventSource.Arn,
 		FilterCriteria:                 nil,
-		FunctionArn:                    eventSource.Function.GetArn(),
+		FunctionArn:                    eventSource.Function.GetArn(ctx),
 		FunctionResponseTypes:          nil,
 		LastModified:                   &lastModified,
 		LastProcessingResult:           nil,

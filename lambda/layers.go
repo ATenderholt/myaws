@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
@@ -40,7 +41,7 @@ func GetAllLayerVersions(response http.ResponseWriter, request *http.Request) {
 	}
 
 	result := lambda.ListLayerVersionsOutput{
-		LayerVersions: layersToAwsLayers(layers),
+		LayerVersions: layersToAwsLayers(layers, ctx),
 		NextMarker:    nil,
 	}
 
@@ -79,8 +80,8 @@ func GetLayerVersion(response http.ResponseWriter, request *http.Request) {
 		},
 		CreatedDate:     &layer.CreatedOn,
 		Description:     &layer.Description,
-		LayerArn:        layer.GetArn(),
-		LayerVersionArn: layer.GetVersionArn(),
+		LayerArn:        layer.GetArn(ctx),
+		LayerVersionArn: layer.GetVersionArn(ctx),
 		LicenseInfo:     nil,
 		Version:         int64(layer.Version),
 	}
@@ -88,10 +89,10 @@ func GetLayerVersion(response http.ResponseWriter, request *http.Request) {
 	utils.RespondWithJson(response, result)
 }
 
-func layersToAwsLayers(layers []types.LambdaLayer) []aws.LayerVersionsListItem {
+func layersToAwsLayers(layers []types.LambdaLayer, ctx context.Context) []aws.LayerVersionsListItem {
 	results := make([]aws.LayerVersionsListItem, len(layers))
 	for i, layer := range layers {
-		results[i] = layer.ToLayerVersionsListItem()
+		results[i] = layer.ToLayerVersionsListItem(ctx)
 	}
 
 	return results
@@ -177,7 +178,7 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	result := savedLayer.ToPublishLayerVersionOutput()
+	result := savedLayer.ToPublishLayerVersionOutput(ctx)
 
 	utils.RespondWithJson(response, result)
 }

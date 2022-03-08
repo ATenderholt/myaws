@@ -156,7 +156,7 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 		CodeSha256:         hash,
 	}
 
-	destPath := layer.GetDestPath()
+	destPath := layer.GetDestPath(ctx)
 	log.Info("Saving layer %s to %s...", layerName, destPath)
 	err = utils.CreateDirs(filepath.Dir(destPath))
 	if err != nil {

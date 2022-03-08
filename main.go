@@ -20,17 +20,19 @@ import (
 )
 
 func main() {
+	cfg := settings.DefaultConfig()
+	mainCtx := cfg.NewContext(context.Background())
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(mainCtx)
 	go func() {
 		s := <-c
 		log.Info("Received signal %v", s)
 		cancel()
 	}()
 
-	cfg := settings.DefaultConfig()
 	if err := start(ctx, cfg); err != nil {
 		log.Error("Failed to start: %v", err)
 	}

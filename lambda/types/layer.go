@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"myaws/config"
 	"myaws/settings"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -22,9 +22,19 @@ type LambdaLayer struct {
 	CodeSha256         string
 }
 
-func (layer LambdaLayer) GetDestPath() string {
-	return filepath.Join(config.GetDataPath(), "lambda", "layers", layer.Name,
-		strconv.Itoa(layer.Version)+".zip")
+func (layer LambdaLayer) GetDestPath(ctx context.Context) string {
+	fileName := strconv.Itoa(layer.Version) + ".zip"
+	cfg, ok := settings.FromContext(ctx)
+	if ok {
+		return filepath.Join(cfg.DataPath(), "lambda", "layers", layer.Name, fileName)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	return filepath.Join(cwd, settings.DefaultDataPath, "lambda", "layers", layer.Name, fileName)
 }
 
 func (layer LambdaLayer) GetArn(ctx context.Context) *string {

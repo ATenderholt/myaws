@@ -219,14 +219,14 @@ func StartFunction(ctx context.Context, function *types.Function) error {
 		Command: []string{function.Handler},
 		Mounts: []mount.Mount{
 			{
-				Source:      function.GetDestPath(),
+				Source:      function.GetDestPath(ctx),
 				Target:      "/var/task",
 				Type:        mount.TypeBind,
 				ReadOnly:    true,
 				Consistency: mount.ConsistencyDelegated,
 			},
 			{
-				Source:      function.GetLayerDestPath(),
+				Source:      function.GetLayerDestPath(ctx),
 				Target:      "/opt",
 				Type:        mount.TypeBind,
 				ReadOnly:    true,

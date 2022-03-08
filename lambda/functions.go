@@ -69,7 +69,7 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 
 	// TODO : validate Layer runtime support
 
-	err = utils.UncompressZipFileBytes(code.ZipFile, function.GetDestPath())
+	err = utils.UncompressZipFileBytes(code.ZipFile, function.GetDestPath(ctx))
 	if err != nil {
 		msg := fmt.Sprintf("error when saving function %s: %v", *body.FunctionName, err)
 		log.Error(msg)
@@ -77,7 +77,7 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	layerDestPath := function.GetLayerDestPath()
+	layerDestPath := function.GetLayerDestPath(ctx)
 	err = utils.CreateDirs(layerDestPath)
 	if err != nil {
 		msg := log.Error("Unable to create Layer path for Function %s: %v", function.FunctionName, err)
@@ -86,7 +86,7 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 	}
 
 	for _, layer := range function.Layers {
-		layerPath := layer.GetDestPath()
+		layerPath := layer.GetDestPath(ctx)
 		err = utils.UncompressZipFile(layerPath, layerDestPath)
 		if err != nil {
 			msg := log.Error("error when unpacking layer %s: %v", layer.Name, err)

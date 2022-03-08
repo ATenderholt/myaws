@@ -5,9 +5,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	aws "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/smithy-go/middleware"
-	"myaws/config"
 	"myaws/settings"
 	"myaws/utils"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -266,14 +266,28 @@ func layersToAws(layers []LambdaLayer, ctx context.Context) []aws.Layer {
 	return results
 }
 
-func (f *Function) GetDestPath() string {
-	return filepath.Join(config.GetDataPath(), "lambda", "functions", f.FunctionName,
-		f.Version, "content")
+func (f *Function) GetBasePath(ctx context.Context) string {
+	cfg, ok := settings.FromContext(ctx)
+	if ok {
+		return filepath.Join(cfg.DataPath(), "lambda", "functions", f.FunctionName, f.Version)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	return filepath.Join(cwd, settings.DefaultDataPath, "lambda", "functions", f.FunctionName, f.Version)
 }
 
-func (f *Function) GetLayerDestPath() string {
-	return filepath.Join(config.GetDataPath(), "lambda", "functions", f.FunctionName,
-		f.Version, "layers")
+func (f *Function) GetDestPath(ctx context.Context) string {
+	basePath := f.GetBasePath(ctx)
+	return filepath.Join(basePath, "content")
+}
+
+func (f *Function) GetLayerDestPath(ctx context.Context) string {
+	basePath := f.GetBasePath(ctx)
+	return filepath.Join(basePath, "layers")
 }
 
 func (f *Function) GetArn(ctx context.Context) *string {

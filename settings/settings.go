@@ -2,7 +2,6 @@ package settings
 
 import (
 	"context"
-	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -28,10 +27,11 @@ type Config struct {
 	IsDebug       bool
 	Region        string
 
-	Lambda Server
-	Moto   Server
-	S3     Server
-	SQS    Server
+	Database *Database
+	Lambda   *Server
+	Moto     *Server
+	S3       *Server
+	SQS      *Server
 
 	dataPath string
 }
@@ -53,6 +53,10 @@ func (config *Config) DataPath() string {
 	return filepath.Join(cwd, config.dataPath)
 }
 
+func (config *Config) DbConnectionString() string {
+	return config.Database.connectionString(config.dataPath)
+}
+
 func (config *Config) NewContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, configContextKey, config)
 }
@@ -62,17 +66,12 @@ func FromContext(ctx context.Context) (*Config, bool) {
 	return cfg, ok
 }
 
-func (config Config) WithAccountAndRegion(f func(http.ResponseWriter, *http.Request, string, string)) func(http.ResponseWriter, *http.Request) {
-	return func(writer http.ResponseWriter, response *http.Request) {
-		f(writer, response, config.Region, config.AccountNumber)
-	}
-}
-
 func DefaultConfig() *Config {
 	return &Config{
 		AccountNumber: DefaultAccountNumber,
 		IsDebug:       false,
 		Region:        DefaultRegion,
+		Database:      DefaultDatabase(),
 		Lambda:        NewLocalhostServer(DefaultLambdaPort),
 		Moto:          NewLocalhostServer(DefaultMotoPort),
 		S3:            NewLocalhostServer(DefaultS3Port),

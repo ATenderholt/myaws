@@ -10,10 +10,10 @@ type Server struct {
 	Port     int
 }
 
-func (server Server) BuildUrl(path string) string {
+func (server *Server) BuildUrl(path string) string {
 	return server.Protocol + "://" + server.Host + ":" + strconv.Itoa(server.Port) + path
 }
 
-func NewLocalhostServer(port int) Server {
-	return Server{Protocol: "http", Host: "localhost", Port: port}
+func NewLocalhostServer(port int) *Server {
+	return &Server{Protocol: "http", Host: "localhost", Port: port}
 }

@@ -2,16 +2,16 @@ package sqs
 
 import (
 	"errors"
-	"fmt"
 	"io"
-	"myaws/config"
 	"myaws/log"
+	"myaws/settings"
 	"net/http"
 	"strings"
 )
 
 func ProxyToElasticMQ(response http.ResponseWriter, request *http.Request) {
-	in, out, err := proxyToElasticMQ(&response, request, config.Region())
+	cfg := settings.FromContext(request.Context())
+	in, out, err := proxyToElasticMQ(&response, request, cfg.Region)
 	log.Info("SQS Request Payload: %s", in)
 	log.Info("SQS Response Body: %s", out)
 
@@ -21,7 +21,8 @@ func ProxyToElasticMQ(response http.ResponseWriter, request *http.Request) {
 }
 
 func proxyToElasticMQ(response *http.ResponseWriter, request *http.Request, region string) (in string, out string, err error) {
-	url := fmt.Sprintf("http://%s:%d%s", config.SQS().Host, config.SQS().Port, request.URL.Path)
+	cfg := settings.FromContext(request.Context())
+	url := cfg.SQS.BuildUrl(request.URL.Path)
 
 	var payloadBuilder strings.Builder
 	requestBody := io.TeeReader(request.Body, &payloadBuilder)

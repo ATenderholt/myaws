@@ -9,10 +9,10 @@ import (
 	"github.com/docker/distribution/uuid"
 	"github.com/docker/docker/api/types/mount"
 	"io"
-	"myaws/config"
 	"myaws/docker"
 	"myaws/lambda/types"
 	"myaws/log"
+	"myaws/settings"
 	"net/http"
 	"strings"
 )
@@ -119,11 +119,13 @@ func (manager *ManagerImpl) StartEventSource(ctx context.Context, eventSource *t
 	listQueuesOutput, err := client.ListQueues(ctx, &sqs.ListQueuesInput{QueueNamePrefix: &queueName})
 	if err != nil {
 		msg := log.Error("Unable to list queues for %s: %v", queueName, err)
+		cancel()
 		return errors.New(msg)
 	}
 
 	if len(listQueuesOutput.QueueUrls) != 1 {
 		msg := log.Error("Found %d queue urls for %s: %v", len(listQueuesOutput.QueueUrls), queueName, listQueuesOutput.QueueUrls)
+		cancel()
 		return errors.New(msg)
 	}
 
@@ -169,13 +171,9 @@ type PortPool struct {
 	available map[int]bool
 }
 
-var pool PortPool
+var pool *PortPool
 
-func init() {
-	pool = NewPortPool(config.Lambda().Port, config.Lambda().Port+100)
-}
-
-func NewPortPool(min, max int) PortPool {
+func NewPortPool(min, max int) *PortPool {
 	available := make(map[int]bool, max-min)
 
 	pool := PortPool{available}
@@ -183,7 +181,7 @@ func NewPortPool(min, max int) PortPool {
 		pool.available[i] = true
 	}
 
-	return pool
+	return &pool
 }
 
 func (pool PortPool) Get() (int, error) {
@@ -205,6 +203,11 @@ func (pool PortPool) Get() (int, error) {
 }
 
 func StartFunction(ctx context.Context, function *types.Function) error {
+	cfg := settings.FromContext(ctx)
+	if pool == nil {
+		pool = NewPortPool(cfg.Lambda.Port, cfg.Lambda.Port+100)
+	}
+
 	port, err := pool.Get()
 	if err != nil {
 		msg := log.Error("Unable to start Function %s: %v", function.FunctionName, err)

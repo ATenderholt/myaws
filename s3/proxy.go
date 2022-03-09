@@ -2,12 +2,11 @@ package s3
 
 import (
 	"errors"
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"io"
-	"myaws/config"
 	"myaws/log"
+	"myaws/settings"
 	"net/http"
 	"strings"
 	"time"
@@ -21,7 +20,8 @@ func ProxyToMinio(response http.ResponseWriter, request *http.Request) {
 }
 
 func proxyToMinio(response *http.ResponseWriter, request *http.Request, region string) error {
-	url := fmt.Sprintf("http://%s:%d%s", config.S3().Host, config.S3().Port, request.URL.Path)
+	cfg := settings.FromContext(request.Context())
+	url := cfg.S3.BuildUrl(request.URL.Path)
 	var stringBuilder strings.Builder
 	reader := io.TeeReader(request.Body, &stringBuilder)
 	proxyReq, _ := http.NewRequest(request.Method, url, reader)

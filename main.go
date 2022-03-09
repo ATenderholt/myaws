@@ -42,7 +42,7 @@ func start(ctx context.Context, config *settings.Config) error {
 	log.Info("Starting up ...")
 
 	initializeDb(config)
-	initializeDocker(ctx, config)
+	initializeDocker(ctx)
 	server, err := http.Serve(config)
 	if err != nil {
 		panic(err)
@@ -80,14 +80,20 @@ func initializeDb(cfg *settings.Config) {
 	database.Initialize(cfg, migrations)
 }
 
-func initializeDocker(ctx context.Context, cfg *settings.Config) {
+func initializeDocker(ctx context.Context) {
+	cfg := settings.FromContext(ctx)
 	db := database.CreateConnection(cfg)
 
 	go initializeMoto(ctx)
 	go initializeElasticMQ(ctx, db)
 
 	docker.EnsureImage(ctx, s3.Image)
-	_, err := docker.Start(ctx, s3.Container, "")
+	s3Container, err := s3.Container(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = docker.Start(ctx, *s3Container, "")
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +116,14 @@ func initializeDocker(ctx context.Context, cfg *settings.Config) {
 
 func initializeMoto(ctx context.Context) {
 	docker.EnsureImage(ctx, moto.Image)
-	motoReady, err := docker.Start(ctx, moto.Container, "Running on http")
+
+	cfg := settings.FromContext(ctx)
+	container, err := moto.Container(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	motoReady, err := docker.Start(ctx, *container, "Running on http")
 	if err != nil {
 		panic(err)
 	}
@@ -127,7 +140,13 @@ func initializeMoto(ctx context.Context) {
 
 func initializeElasticMQ(ctx context.Context, db *database.Database) {
 	docker.EnsureImage(ctx, sqs.Image)
-	elasticReady, err := docker.Start(ctx, sqs.Container, "started in")
+	cfg := settings.FromContext(ctx)
+	container, err := sqs.Container(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	elasticReady, err := docker.Start(ctx, *container, "started in")
 	if err != nil {
 		panic(err)
 	}

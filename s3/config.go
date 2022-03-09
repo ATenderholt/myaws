@@ -1,37 +1,38 @@
 package s3
 
 import (
+	"errors"
 	"github.com/docker/docker/api/types/mount"
-	"myaws/config"
 	"myaws/docker"
 	"myaws/log"
+	"myaws/settings"
 	"myaws/utils"
 	"path/filepath"
 )
 
 const Image = "bitnami/minio:2022.2.16"
 
-var basePath = filepath.Join(config.GetDataPath(), "s3")
-var Container = docker.Container{
-	Name:  "s3",
-	Image: Image,
-	Mounts: []mount.Mount{
-		{
-			Source: basePath,
-			Target: "/data",
-			Type:   mount.TypeBind,
-		},
-	},
-	Ports: map[int]int{
-		9000: 9000,
-		9001: 9001,
-	},
-}
-
-func init() {
+func Container(cfg *settings.Config) (*docker.Container, error) {
+	basePath := filepath.Join(cfg.DataPath(), "s3")
 	err := utils.CreateDirs(basePath)
 	if err != nil {
 		msg := log.Error("Unable to create directory %s: %v", basePath, err)
-		panic(msg)
+		return nil, errors.New(msg)
 	}
+
+	return &docker.Container{
+		Name:  "s3",
+		Image: Image,
+		Mounts: []mount.Mount{
+			{
+				Source: basePath,
+				Target: "/data",
+				Type:   mount.TypeBind,
+			},
+		},
+		Ports: map[int]int{
+			9000: cfg.S3.Port,
+			9001: cfg.S3.Port + 1,
+		},
+	}, nil
 }

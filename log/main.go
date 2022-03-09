@@ -3,26 +3,27 @@ package log
 import (
 	"fmt"
 	base "log"
-	"myaws/config"
 	"os"
 	"runtime"
 )
 
+var isDebug bool
 var debug *base.Logger
 var err *base.Logger
 var info *base.Logger
 
 func init() {
-	if config.IsDebug() {
-		debug = base.New(os.Stdout, "[DEBUG] ", base.LstdFlags)
-	}
-
+	debug = base.New(os.Stdout, "[DEBUG] ", base.LstdFlags)
 	err = base.New(os.Stdout, "[ERROR] ", base.LstdFlags)
 	info = base.New(os.Stdout, "[INFO]  ", base.LstdFlags)
 }
 
+func SetDebug(debug bool) {
+	isDebug = debug
+}
+
 func Debug(format string, v ...interface{}) {
-	if !config.IsDebug() {
+	if isDebug {
 		return
 	}
 

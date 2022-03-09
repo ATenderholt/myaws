@@ -3,9 +3,7 @@ package moto
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
-	"myaws/config"
 	"myaws/database"
 	"myaws/log"
 	"myaws/moto/queries"
@@ -26,7 +24,8 @@ type ShouldPersist func(http.Header, string) bool
 func ProxyToMoto(writer *http.ResponseWriter, request *http.Request, service string, shouldPersist ShouldPersist) (in string, out string, err error) {
 	log.Info("Proxying %s request to moto ...", service)
 
-	url := fmt.Sprintf("http://%s:%d%s", config.Moto().Host, config.Moto().Port, request.URL.Path)
+	cfg := settings.FromContext(request.Context())
+	url := cfg.Moto.BuildUrl(request.URL.Path)
 
 	var payloadBuilder strings.Builder
 	requestBody := io.TeeReader(request.Body, &payloadBuilder)
@@ -107,10 +106,10 @@ func InsertRequest(service string, request *http.Request, payload string) error 
 	return nil
 }
 
-func ReplayToMoto(request types.ApiRequest) error {
+func ReplayToMoto(cfg *settings.Config, request types.ApiRequest) error {
 	log.Info("Replaying %s request #%d to moto ...", request.Service, request.ID)
 
-	url := fmt.Sprintf("http://%s:%d%s", config.Moto().Host, config.Moto().Port, request.Path)
+	url := cfg.Moto.BuildUrl(request.Path)
 
 	proxyReq, _ := http.NewRequest(request.Method, url, strings.NewReader(request.Payload))
 	proxyReq.Header.Set("Content-Type", request.ContentType)
@@ -143,7 +142,7 @@ func ReplayAllToMoto(ctx context.Context) error {
 	for {
 		select {
 		case result := <-results:
-			err := ReplayToMoto(result)
+			err := ReplayToMoto(cfg, result)
 			if err != nil {
 				cancel()
 				msg := log.Error("Unable to replay to moto requests: %v", err)

@@ -7,7 +7,6 @@ import (
 	"github.com/aws/smithy-go/middleware"
 	"myaws/settings"
 	"myaws/utils"
-	"os"
 	"path/filepath"
 	"time"
 )
@@ -267,17 +266,8 @@ func layersToAws(layers []LambdaLayer, ctx context.Context) []aws.Layer {
 }
 
 func (f *Function) GetBasePath(ctx context.Context) string {
-	cfg, ok := settings.FromContext(ctx)
-	if ok {
-		return filepath.Join(cfg.DataPath(), "lambda", "functions", f.FunctionName, f.Version)
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
-	return filepath.Join(cwd, settings.DefaultDataPath, "lambda", "functions", f.FunctionName, f.Version)
+	cfg := settings.FromContext(ctx)
+	return filepath.Join(cfg.DataPath(), "lambda", "functions", f.FunctionName, f.Version)
 }
 
 func (f *Function) GetDestPath(ctx context.Context) string {
@@ -291,13 +281,7 @@ func (f *Function) GetLayerDestPath(ctx context.Context) string {
 }
 
 func (f *Function) GetArn(ctx context.Context) *string {
-	cfg, ok := settings.FromContext(ctx)
-	var result string
-	if ok {
-		result = "arn:aws:lambda:" + cfg.Region + ":" + cfg.AccountNumber + ":function:" + f.FunctionName
-	} else {
-		result = "arn:aws:lambda:" + settings.DefaultRegion + ":" + settings.DefaultAccountNumber + ":function:" + f.FunctionName
-	}
-
+	cfg := settings.FromContext(ctx)
+	result := "arn:aws:lambda:" + cfg.Region + ":" + cfg.AccountNumber + ":function:" + f.FunctionName
 	return &result
 }

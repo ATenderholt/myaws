@@ -14,6 +14,7 @@ import (
 	"myaws/lambda/queries"
 	"myaws/lambda/types"
 	"myaws/log"
+	"myaws/settings"
 	"myaws/utils"
 	"net/http"
 	"path/filepath"
@@ -32,7 +33,8 @@ func GetAllLayerVersions(response http.ResponseWriter, request *http.Request) {
 	layerName := getLayerName(request.URL.Path)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	layers, err := queries.LayerByName(ctx, db, layerName)
@@ -60,7 +62,8 @@ func GetLayerVersion(response http.ResponseWriter, request *http.Request) {
 	layerName, version := getLayerNameAndVersion(request.URL.Path)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	layer, err := queries.LayerByNameAndVersion(ctx, db, layerName, version)
@@ -117,7 +120,8 @@ func PostLayerVersions(response http.ResponseWriter, request *http.Request) {
 	log.Info("Layer runtimes: %v", body.CompatibleRuntimes)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	dbRuntimes, err := queries.RuntimeIDsByNames(ctx, db, body.CompatibleRuntimes)

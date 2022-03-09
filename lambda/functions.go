@@ -13,6 +13,7 @@ import (
 	"myaws/lambda/queries"
 	"myaws/lambda/types"
 	"myaws/log"
+	"myaws/settings"
 	"myaws/utils"
 	"net/http"
 	"strconv"
@@ -39,7 +40,8 @@ func PostLambdaFunction(response http.ResponseWriter, request *http.Request) {
 	log.Info("Creating lambda function %+v", body)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	runtimeExists, err := queries.RuntimeExistsByName(ctx, db, body.Runtime)
@@ -127,7 +129,8 @@ func PutLambdaConfiguration(response http.ResponseWriter, request *http.Request)
 	log.Info("Configuration: %+v", body)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	function, err := queries.LatestFunctionByName(ctx, db, name)
@@ -164,7 +167,8 @@ func GetLambdaFunction(response http.ResponseWriter, request *http.Request) {
 	log.Info("Getting Lambda Function %s", name)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	function, err := queries.LatestFunctionByName(ctx, db, name)
@@ -195,7 +199,8 @@ func GetFunctionVersions(response http.ResponseWriter, request *http.Request) {
 	log.Info("Getting Versions for Lambda Function %s", name)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	functions, err := queries.FunctionVersionsByName(ctx, db, name)

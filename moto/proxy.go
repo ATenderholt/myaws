@@ -10,6 +10,7 @@ import (
 	"myaws/log"
 	"myaws/moto/queries"
 	"myaws/moto/types"
+	"myaws/settings"
 	"net/http"
 	"strings"
 )
@@ -78,7 +79,9 @@ func ProxyToMoto(writer *http.ResponseWriter, request *http.Request, service str
 
 func InsertRequest(service string, request *http.Request, payload string) error {
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	authorization := request.Header.Get(Authorization)
@@ -131,7 +134,8 @@ func ReplayToMoto(request types.ApiRequest) error {
 func ReplayAllToMoto(ctx context.Context) error {
 	log.Info("Replaying all requests to moto ...")
 
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	dbCtx, cancel := context.WithCancel(ctx)

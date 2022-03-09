@@ -61,9 +61,13 @@ func (config *Config) NewContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, configContextKey, config)
 }
 
-func FromContext(ctx context.Context) (*Config, bool) {
+func FromContext(ctx context.Context) *Config {
 	cfg, ok := ctx.Value(configContextKey).(*Config)
-	return cfg, ok
+	if ok {
+		return cfg
+	}
+
+	return DefaultConfig()
 }
 
 func DefaultConfig() *Config {

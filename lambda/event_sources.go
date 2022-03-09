@@ -9,6 +9,7 @@ import (
 	"myaws/lambda/queries"
 	"myaws/lambda/types"
 	"myaws/log"
+	"myaws/settings"
 	"myaws/utils"
 	"net/http"
 	"strings"
@@ -31,7 +32,8 @@ func PostEventSource(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 
 	function, err := queries.LatestFunctionByName(ctx, db, *payload.FunctionName)
 	if err != nil {
@@ -72,7 +74,8 @@ func GetEventSource(writer http.ResponseWriter, request *http.Request) {
 	log.Info("Getting event source %s ... ", id)
 
 	ctx := request.Context()
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 
 	eventSource, err := queries.LoadEventSource(ctx, db, id)
 	if err != nil {

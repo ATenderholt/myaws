@@ -8,6 +8,7 @@ import (
 	"io"
 	"myaws/database"
 	"myaws/log"
+	"myaws/settings"
 	"myaws/sqs/queries"
 	"myaws/sqs/types"
 	"net/http"
@@ -99,7 +100,8 @@ func createQueue(ctx context.Context, writer *http.ResponseWriter, proxyResponse
 		queue.Tags[matches[1]] = matches[2]
 	}
 
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	err := queries.SaveQueue(ctx, db, queue)
@@ -125,7 +127,8 @@ func getQueueAttributes(ctx context.Context, writer *http.ResponseWriter, proxyR
 		return payload, "", errors.New(msg)
 	}
 
-	db := database.CreateConnection()
+	cfg := settings.FromContext(ctx)
+	db := database.CreateConnection(cfg)
 	defer db.Close()
 
 	queue, err := queries.LoadQueue(ctx, db, name[1])

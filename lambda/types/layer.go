@@ -5,7 +5,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"myaws/settings"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -24,28 +23,13 @@ type LambdaLayer struct {
 
 func (layer LambdaLayer) GetDestPath(ctx context.Context) string {
 	fileName := strconv.Itoa(layer.Version) + ".zip"
-	cfg, ok := settings.FromContext(ctx)
-	if ok {
-		return filepath.Join(cfg.DataPath(), "lambda", "layers", layer.Name, fileName)
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
-	return filepath.Join(cwd, settings.DefaultDataPath, "lambda", "layers", layer.Name, fileName)
+	cfg := settings.FromContext(ctx)
+	return filepath.Join(cfg.DataPath(), "lambda", "layers", layer.Name, fileName)
 }
 
 func (layer LambdaLayer) GetArn(ctx context.Context) *string {
-	cfg, ok := settings.FromContext(ctx)
-	var result string
-	if ok {
-		result = "arn:aws:lambda:" + cfg.Region + ":" + cfg.AccountNumber + ":layer:" + layer.Name
-	} else {
-		result = "arn:aws:lambda:" + settings.DefaultRegion + ":" + settings.DefaultAccountNumber + ":layer:" + layer.Name
-	}
-
+	cfg := settings.FromContext(ctx)
+	result := "arn:aws:lambda:" + cfg.Region + ":" + cfg.AccountNumber + ":layer:" + layer.Name
 	return &result
 }
 

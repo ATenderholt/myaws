@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"myaws/log"
+	"myaws/settings"
 )
 
 type Migration struct {
@@ -41,8 +42,8 @@ CREATE TABLE IF NOT EXISTS migration (
 )
 `
 
-func Initialize(migrations Migrations) {
-	db := CreateConnection()
+func Initialize(cfg *settings.Config, migrations Migrations) {
+	db := CreateConnection(cfg)
 	defer db.Close()
 
 	log.Info("Creating migration table if necessary")

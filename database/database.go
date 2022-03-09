@@ -4,21 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"myaws/config"
 	"myaws/log"
-	"path/filepath"
+	"myaws/settings"
 )
 
 type Database struct {
 	wrapped *sql.DB
 }
 
-func CreateConnection() *Database {
-	dbPath := filepath.Join(config.GetDataPath(), "db.sqlite3")
-	connStr := fmt.Sprintf("file:%s", dbPath)
-
-	db, err := sql.Open("sqlite3", connStr)
+func CreateConnection(cfg *settings.Config) *Database {
+	db, err := sql.Open("sqlite3", cfg.DbConnectionString())
 	if err != nil {
 		log.Panic("unable to open database: %v", err)
 	}

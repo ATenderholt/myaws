@@ -41,8 +41,8 @@ func main() {
 func start(ctx context.Context, config *settings.Config) error {
 	log.Info("Starting up ...")
 
-	initializeDb()
-	initializeDocker(ctx)
+	initializeDb(config)
+	initializeDocker(ctx, config)
 	server, err := http.Serve(config)
 	if err != nil {
 		panic(err)
@@ -70,18 +70,18 @@ func start(ctx context.Context, config *settings.Config) error {
 	return nil
 }
 
-func initializeDb() {
+func initializeDb(cfg *settings.Config) {
 	var migrations database.Migrations
 	migrations.AddAll(lambda.Migrations)
 	migrations.AddAll(moto.Migrations)
 	migrations.AddAll(sqs.Migrations)
 
 	log.Info("Initializing DB with %d Migrations.", migrations.Size())
-	database.Initialize(migrations)
+	database.Initialize(cfg, migrations)
 }
 
-func initializeDocker(ctx context.Context) {
-	db := database.CreateConnection()
+func initializeDocker(ctx context.Context, cfg *settings.Config) {
+	db := database.CreateConnection(cfg)
 
 	go initializeMoto(ctx)
 	go initializeElasticMQ(ctx, db)

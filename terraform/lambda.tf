@@ -97,3 +97,16 @@ resource "aws_lambda_function" "copy_file" {
     }
   }
 }
+
+resource "aws_lambda_permission" "copy_file" {
+  statement_id  = "InvokeFromS3"
+  action        = "lambda:InvokeFunction"
+  function_name = "myaws-copy-file"
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.main.arn
+}
+
+resource "aws_iam_role_policy_attachment" "copy_file" {
+  role       = aws_iam_role.copy_file.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
